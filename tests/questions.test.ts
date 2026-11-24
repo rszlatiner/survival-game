@@ -101,6 +101,30 @@ describe("every template, every zone, seeds 1..20", () => {
   }
 });
 
+describe("u11-inverse-choice-01 cannot be guessed from 'more people, less time'", () => {
+  it("has two or more options below the original time, and the correct one is not always the smallest", () => {
+    const t = UNIT_11.find((x) => x.id === "u11-inverse-choice-01")!;
+    const ranks = new Set<number>();
+    for (const zone of ZONE_IDS) {
+      for (let s = 1; s <= 200; s++) {
+        const { publicQ, expected } = generateQuestion(t, zone, String(s));
+        const where = `${zone} seed ${s}`;
+        const opts = publicQ.options!;
+        expect(opts, where).toHaveLength(4);
+        expect(new Set(opts).size, where).toBe(4);
+        expect(opts.filter((o) => o === expected).length, where).toBe(1);
+        const original = Number(/take (\d+) days/.exec(publicQ.prompt)![1]);
+        const nums = opts.map((o) => Number(/^(\d+) days$/.exec(o)![1]));
+        expect(nums.filter((n) => n < original).length, where).toBeGreaterThanOrEqual(2);
+        const sorted = [...nums].sort((a, b) => a - b);
+        ranks.add(sorted.indexOf(Number(/^(\d+)/.exec(expected as string)![1])));
+      }
+    }
+    expect(ranks.has(0) && ranks.size >= 2).toBe(true);
+    expect([...ranks].some((r) => r > 0)).toBe(true);
+  });
+});
+
 describe("generateQuestion", () => {
   it("is deterministic for (template, zone, seed)", () => {
     for (const t of ALL_TEMPLATES) {

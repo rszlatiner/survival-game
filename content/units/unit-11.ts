@@ -350,7 +350,7 @@ export const UNIT_11: QuestionTemplate[] = [
     prompt: ({ g, x, y, m }, zone) =>
       `${Z[zone].Place}, ${g * x} people can cut enough ${Z[zone].wood} for the raft in ${y * m} hours. ` +
       `A storm is coming, so it must be done in ${x * m} hours. ` +
-      `At the same rate, how many people are needed?`,
+      `At the same rate, how many people are needed in total?`,
     expected: ({ g, y }) => g * y,
     solution: ({ g, x, y, m }) =>
       `The job is ${g * x} × ${y * m} = ${g * x * y * m} person-hours. ` +
@@ -362,12 +362,23 @@ export const UNIT_11: QuestionTemplate[] = [
     difficulty: 3,
     resource: "stone",
     format: CHOICE,
-    params: (rng) => ({ f: int(rng, 2, 4), m: int(rng, 2, 6), P: int(rng, 2, 5) }),
+    params(rng) {
+      const m = int(rng, 2, 6);
+      // o = how many near-miss options sit below the answer, so its rank among the options varies.
+      return { f: int(rng, 2, 4), m, P: int(rng, 2, 5), o: Math.min(int(rng, 0, 2), m - 1) };
+    },
     prompt: ({ f, m, P }, zone) =>
       `${P} people take ${f * m} days to drag ${Z[zone].stone} up for the signal tower. ` +
       `If ${P * f} people work at the same rate instead, how long will it take?`,
-    // D = f*m >= 4, so D + f never equals D * f and all four differ.
-    options: ({ f, m }) => [`${m} days`, `${f * m * f} days`, `${f * m} days`, `${f * m + f} days`],
+    // Three consecutive near-misses m-o .. m-o+2 (all >= 1) plus one direct-proportion
+    // distractor f*f*m >= 4m > m+2, so all four differ. m+1 < f*m (m, f >= 2), so at least
+    // two options are below the original time and "pick the smallest" does not work.
+    options: ({ f, m, o }) => [
+      `${m - o} days`,
+      `${m - o + 1} days`,
+      `${m - o + 2} days`,
+      `${f * f * m} days`,
+    ],
     expected: ({ m }) => `${m} days`,
     solution: ({ f, m, P }) =>
       `${P * f} people is ${f} times as many, so the time is divided by ${f} (inverse proportion). ` +
