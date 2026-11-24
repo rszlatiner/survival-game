@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "simulate": "tsx scripts/simulate.ts",
+    "loadcheck": "tsx scripts/loadcheck.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",
@@ -26,6 +28,7 @@
     "jsdom": "^31.0.1",
     "postcss": "^8.5.33",
     "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.1"
   }
