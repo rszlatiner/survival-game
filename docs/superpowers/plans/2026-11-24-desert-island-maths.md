@@ -4,7 +4,7 @@
 
 **Goal:** Build the first playable of a teacher-run, Catan-style classroom maths game: teams share a desert island, solve maths problems to harvest and build, and exactly one team escapes first or wins on points.
 
-**Architecture:** A pure, I/O-free game engine (`lib/engine`) holds every rule and is fully unit-tested. A repository interface has an in-memory implementation for tests and a Supabase implementation for production. Next.js route handlers are the only writers, so correct answers never reach browsers; clients read a stripped public state through Supabase Realtime with an automatic polling fallback.
+**Architecture:** A pure, I/O-free game engine (`lib/engine`) holds every rule and is fully unit-tested. A repository interface has an in-memory implementation for tests and a Supabase implementation for production. Next.js route handlers are the only writers, so correct answers never reach browsers; clients fetch a stripped public state from a Next.js endpoint, nudged by a Supabase Realtime Broadcast ping and backed by automatic polling. No table is readable with the public anon key.
 
 **Tech Stack:** Next.js (App Router) + TypeScript, Tailwind, Vitest, Supabase (Postgres + Realtime), Vercel (hosting and cron), GitHub.
 
@@ -214,7 +214,8 @@ README.md
   - `memoryRepo(): GameRepo` and `supabaseRepo(url:string, serviceKey:string): GameRepo`
   - `signToken(payload:{role:'host'|'team'; code:string; teamId?:string; deviceId?:string}, secret:string, ttlMs:number, now:number): string` and `verifyToken(token:string, secret:string, now:number): payload | null` (HMAC; expired or tampered gives null)
   - `toPublicState(g: GameState, now: number): PublicGameState` (no `seed`, no `expected`, no `solution` before reveal; solutions and correctness appear only in phase `reveal` and later)
-- Migration: `games(code text primary key, state jsonb not null, version int not null, created_at timestamptz not null)` with no anon access; `game_public(code text primary key, state jsonb not null)` with RLS allowing anon `select` only; `game_public` added to the realtime publication.
+- Migration (ruling after Task 9 review: no public table, no anon access at all): only `games(code text primary key, state jsonb not null, version int not null, created_at timestamptz not null)` with RLS enabled, NO policies, `revoke all on public.games from anon, authenticated`, and an index on `created_at`. Anon browsers never read the database; the server reads with the service role and serves `toPublicState` from an endpoint.
+  - `interface Notifier { notify(code: string, version: number): Promise<boolean> }`, `noopNotifier()` and `supabaseNotifier(url: string, serviceKey: string, fetchImpl?: typeof fetch): Notifier` in `lib/repo/notify.ts`: POSTs one Realtime Broadcast message (`topic: "game:<code>"`, `event: "version"`, `payload: {version}`, `private: false`) to `${url}/realtime/v1/api/broadcast`; never throws (returns false on any failure).
 
 - [ ] **Step 1: Failing tests.** Memory repo `save` with a stale version throws `VersionConflict`; `deleteOlderThan` removes only games older than the cutoff. Tokens: tampered, expired, wrong-secret, and wrong-code tokens all verify as null; a valid host token verifies. `toPublicState` during `question` phase contains no string equal to any `solution`, and no string equal to any `expected` for non-choice questions (deep scan over a game with 5 teams); for choice questions the correct option is one of the displayed options, so assert instead that no field in the public state marks which option is correct before reveal, and after `revealRound` it contains the solutions and each team's correctness.
 - [ ] **Step 2:** Run; expect FAIL. **Step 3:** Implement. Supabase repo uses the service-role client and an update filtered on `version` for optimistic locking, and writes `game_public` after every save. **Step 4:** Run; expect PASS. Commit `feat: persistence, tokens and public state`.
@@ -232,7 +233,9 @@ README.md
   - `joinHandler(repo, env, code, body:{teamName?:string; teamId?:string; deviceId:string}, now): {teamId:string; teamToken:string}`
   - `hostActionHandler(repo, env, code, token, action:{type:'start'|'next'|'reveal'|'extend'|'skip'|'end'|'setCaptain'|'rename'|'remove'|'override'; ...}, now): PublicGameState`
   - `teamActionHandler(repo, env, code, token, action:{type:'submit'|'build'|'exchange'|'contribute'|'suggest'; ...}, now): PublicGameState`
-  - `stateHandler(repo, code, now): PublicGameState` (no token needed; public only)
+  - `stateHandler(repo, code, now): PublicGameState` (no token needed; public only; computed from the stored game with `toPublicState`)
+  - `teamSuggestionsHandler(repo, env, code, token): {suggestions: {deviceId?: never; answer: string}[]}` (team-token authenticated; returns only the caller's own team's suggestions; route `app/api/games/[code]/suggestions/route.ts`).
+  - After every successful save the handler calls `notifier.notify(code, version)` (handlers take a `Notifier` dependency; failures are ignored). Handlers skip `save` when the engine returned the same state object. They re-read the game after any non-`VersionConflict` save error. Seeds are generated with `crypto.randomBytes(16).toString('hex')`. Tokens carry `createdAt` of the game in the payload and the handler compares it; token TTL is at most 24 hours. The `TOKEN_SECRET` must be at least 32 characters. Answer strings are capped at 40 characters at the route layer.
   - Each handler loads, applies engine functions, saves with the version check, and retries once on `VersionConflict`.
   - **Ordering rules (ruling):** `resolveRaider` runs inside host `reveal`. Contributions to the fund are only possible in the `reveal` phase, so `resolveHazard` for a hazard round runs when the host presses `next` (before the next round starts) and at game end, never at `reveal`. `checkWinner` runs after every team `build`, after host `reveal`, and after `resolveHazard`. On `next`: resolve the previous round's hazard, check the winner, then start the next round, or finish when `roundsPlayed` equals `ROUNDS[length]` (calling `startTiebreak` when `tiedIds` is non-empty).
   - Small engine additions this task owns, in `lib/engine/host.ts` with tests: `extendTimer(g, seconds)`, `skipQuestion(g, now)` (replaces the current round's questions with fresh ones for the same units), `overrideTeam(g, teamId, patch:{stock?:Partial<Stock>; sp?:number})` (logged), `endGame(g)` (idempotent; applies `resolveHazard` then final winner logic), and `suggestAnswer(g, teamId, deviceId, answer)` (stores into `round.suggestions`; any teammate device, question phase only).
@@ -250,7 +253,7 @@ README.md
 
 **Interfaces:**
 - Produces:
-  - `useGameState(code: string): { state: PublicGameState | null; status: 'live'|'polling'|'offline' }` (subscribes to Supabase Realtime on `game_public`; if the channel errors or is silent for 5 seconds it polls `/api/games/[code]/state` every 2 seconds; returns to live when the channel recovers)
+  - `useGameState(code: string): { state: PublicGameState | null; status: 'live'|'polling'|'offline' }` (subscribes to the Supabase Realtime Broadcast channel `game:<code>` with the public anon key and, on every `version` ping, fetches `/api/games/[code]/state`; it also fetches every 5 seconds as a safety net; if the channel errors or is silent for 5 seconds it polls every 2 seconds; it ignores any fetched state whose `version` is lower than one already shown; returns to live when the channel recovers)
   - `storage.ts`: `saveSession(code, session)`, `loadSession(code)`, `clearSession(code)` (try/catch around localStorage; falls back to memory)
   - `api.ts`: typed `post()` helpers for host and team actions, attaching the stored token
 
