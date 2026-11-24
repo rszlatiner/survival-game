@@ -72,14 +72,15 @@ export async function createGame(body: CreateBody): Promise<{ code: string }> {
 export async function joinGame(
   code: string,
   who: { teamName: string } | { teamId: string },
-): Promise<{ teamId: string }> {
+): Promise<{ teamId: string; deviceIndex?: number }> {
   const deviceId = getDeviceId();
-  const r = await send<{ teamId: string; teamToken: string }>(`${base(code)}/join`, {
+  const r = await send<{ teamId: string; teamToken: string; deviceIndex?: number }>(`${base(code)}/join`, {
     method: "POST",
     body: { ...who, deviceId },
   });
-  saveSession(code, { token: r.teamToken, role: "team", deviceId, teamId: r.teamId });
-  return { teamId: r.teamId };
+  const deviceIndex = typeof r.deviceIndex === "number" && r.deviceIndex >= 0 ? r.deviceIndex : undefined;
+  saveSession(code, { token: r.teamToken, role: "team", deviceId, teamId: r.teamId, deviceIndex });
+  return { teamId: r.teamId, deviceIndex };
 }
 
 export const postHost = (code: string, action: HostAction) =>

@@ -9,6 +9,8 @@ export interface Session {
   role: "host" | "team";
   deviceId: string;
   teamId?: string;
+  /** Join-order index of this device on its team (captain is `captainIndex`). */
+  deviceIndex?: number;
 }
 
 const PREFIX = "dim:session:";
@@ -34,7 +36,8 @@ function isSession(x: unknown): x is Session {
     (o.role === "host" || o.role === "team") &&
     typeof o.deviceId === "string" &&
     o.deviceId.length > 0 &&
-    (o.teamId === undefined || typeof o.teamId === "string")
+    (o.teamId === undefined || typeof o.teamId === "string") &&
+    (o.deviceIndex === undefined || (typeof o.deviceIndex === "number" && Number.isInteger(o.deviceIndex)))
   );
 }
 

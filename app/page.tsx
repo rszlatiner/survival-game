@@ -1,7 +1,9 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { JoinScreen } from "@/components/team/JoinScreen";
+
 export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-3xl font-bold">Desert Island Maths</h1>
-    </main>
-  );
+  const router = useRouter();
+  return <JoinScreen onJoined={(code) => router.push(`/play/${code}`)} />;
 }

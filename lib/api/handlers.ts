@@ -173,7 +173,7 @@ export function joinHandler(
   code: string,
   body: JoinBody,
   now: number,
-): Promise<{ teamId: string; teamToken: string }> {
+): Promise<{ teamId: string; teamToken: string; deviceIndex: number }> {
   return guard(async () => {
     requireSecret(env);
     const c = normalizeCode(code);
@@ -194,7 +194,9 @@ export function joinHandler(
       TOKEN_TTL_MS,
       now,
     );
-    return { teamId, teamToken };
+    // Join-order position of this device on its team; lets the device tell whether it is the captain.
+    const deviceIndex = g.teams.find((t) => t.id === teamId)?.devices.indexOf(b.deviceId) ?? -1;
+    return { teamId, teamToken, deviceIndex };
   });
 }
 
