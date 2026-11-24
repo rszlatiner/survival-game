@@ -64,9 +64,11 @@ export function submitAnswer(
   answer: string,
   now: number,
 ): GameState {
-  if (g.phase !== "question" || !g.round) throw new GameError("WRONG_PHASE");
+  if ((g.phase !== "question" && g.phase !== "tiebreak") || !g.round) throw new GameError("WRONG_PHASE");
   const team = g.teams.find((t) => t.id === teamId);
-  if (!team || !team.devices.includes(deviceId)) {
+  // In a tiebreak only the tied teams (those given a question) may answer.
+  const outOfTiebreak = g.phase === "tiebreak" && !g.round.questions[teamId];
+  if (!team || !team.devices.includes(deviceId) || outOfTiebreak) {
     throw new GameError("NOT_FOUND", `team ${teamId} / device ${deviceId}`);
   }
   if (g.round.submissions[teamId]) throw new GameError("ALREADY_SUBMITTED");

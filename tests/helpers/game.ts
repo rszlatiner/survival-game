@@ -34,7 +34,11 @@ export function revealGame(opts: { teams?: number; seed?: string; bonus?: Resour
 }
 
 /** Replace one team's stock (and optionally other fields) without touching the rest. */
-export function withTeam(g: GameState, teamId: string, patch: { stock?: Stock; builds?: GameState["teams"][number]["builds"] }): GameState {
+export function withTeam(
+  g: GameState,
+  teamId: string,
+  patch: { stock?: Stock; builds?: GameState["teams"][number]["builds"]; sp?: number; fundGiven?: number },
+): GameState {
   return { ...g, teams: g.teams.map((t) => (t.id === teamId ? { ...t, ...patch } : t)) };
 }
 
