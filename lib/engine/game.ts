@@ -12,7 +12,10 @@ export type GameErrorCode =
   | "BAD_INDEX"
   | "NO_TEAMS"
   | "WRONG_PHASE"
-  | "BAD_UNITS";
+  | "BAD_UNITS"
+  | "NOT_CAPTAIN"
+  | "ALREADY_SUBMITTED"
+  | "NO_QUESTIONS";
 
 export class GameError extends Error {
   code: GameErrorCode;
