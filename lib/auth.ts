@@ -5,6 +5,8 @@ export interface TokenPayload {
   code: string;
   teamId?: string;
   deviceId?: string;
+  /** The game's createdAt, so a token dies with its game even if the code is reused. */
+  createdAt?: number;
 }
 
 export type VerifiedToken = TokenPayload & { exp: number };
@@ -53,11 +55,13 @@ export function verifyToken(token: string, secret: string, now: number, expected
     if (typeof o.exp !== "number" || !Number.isFinite(o.exp) || o.exp <= now) return null;
     if (o.teamId !== undefined && typeof o.teamId !== "string") return null;
     if (o.deviceId !== undefined && typeof o.deviceId !== "string") return null;
+    if (o.createdAt !== undefined && (typeof o.createdAt !== "number" || !Number.isFinite(o.createdAt))) return null;
     if (expectedCode !== undefined && o.code !== expectedCode) return null;
 
     const out: VerifiedToken = { role: o.role, code: o.code, exp: o.exp };
     if (o.teamId !== undefined) out.teamId = o.teamId as string;
     if (o.deviceId !== undefined) out.deviceId = o.deviceId as string;
+    if (o.createdAt !== undefined) out.createdAt = o.createdAt as number;
     return out;
   } catch {
     return null;

@@ -44,3 +44,5 @@ export const HAZARD_EVERY = 4;
 export const HAZARD_THRESHOLD_PER_TEAM = 2;
 export const MAX_TEAMS = 8;
 export const MAX_DEVICES = 6;
+/** Longest answer or suggestion string accepted from a browser. */
+export const MAX_ANSWER_LENGTH = 40;

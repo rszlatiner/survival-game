@@ -118,3 +118,10 @@ describe("checkPassword", () => {
     expect(checkPassword(undefined as never, "hunter2")).toBe(false);
   });
 });
+
+describe("token createdAt", () => {
+  it("round-trips the game's createdAt", () => {
+    const tok = signToken({ role: "host", code: "ABC234", createdAt: 1234 }, SECRET, HOUR, NOW);
+    expect(verifyToken(tok, SECRET, NOW)?.createdAt).toBe(1234);
+  });
+});

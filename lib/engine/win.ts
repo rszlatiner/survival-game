@@ -39,15 +39,28 @@ function declareTie(g: GameState, ids: string[]): GameState {
  */
 export function checkWinner(g: GameState): GameState {
   if (g.winnerId !== null || g.phase === "finished" || g.phase === "tiebreak") return g;
-
-  const finished = g.teams.filter((t) => t.builds.includes("raft3"));
-  if (finished.length > 0) {
-    const best = topBy(topBy(finished, (t) => t.sp), (t) => stockTotal(t.stock));
-    return best.length === 1 ? declareWinner(g, best[0].id) : declareTie(g, best.map((t) => t.id));
-  }
-
+  const raft = raftResult(g);
+  if (raft) return raft;
   if (g.phase === "reveal" && g.roundsPlayed >= ROUNDS[g.length]) return finalWinner(g);
   return g;
+}
+
+/**
+ * The raft half of `checkWinner` only: never runs final scoring. Used during
+ * a round (after builds, trades, contributions and the reveal) so the last
+ * round still gets its spend phase; final scoring waits for `endRoundIfLast`.
+ */
+export function checkRaft(g: GameState): GameState {
+  if (g.winnerId !== null || g.phase === "finished" || g.phase === "tiebreak") return g;
+  return raftResult(g) ?? g;
+}
+
+/** Raft finishers decide the game (or a tie among them); null if nobody has finished. */
+function raftResult(g: GameState): GameState | null {
+  const finished = g.teams.filter((t) => t.builds.includes("raft3"));
+  if (finished.length === 0) return null;
+  const best = topBy(topBy(finished, (t) => t.sp), (t) => stockTotal(t.stock));
+  return best.length === 1 ? declareWinner(g, best[0].id) : declareTie(g, best.map((t) => t.id));
 }
 
 /**

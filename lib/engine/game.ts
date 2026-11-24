@@ -20,7 +20,8 @@ export type GameErrorCode =
   | "ALREADY_BUILT"
   | "MISSING_REQUIREMENT"
   | "BAD_AMOUNT"
-  | "SAME_RESOURCE";
+  | "SAME_RESOURCE"
+  | "BAD_ANSWER";
 
 export class GameError extends Error {
   code: GameErrorCode;
