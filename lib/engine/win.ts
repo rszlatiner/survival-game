@@ -35,7 +35,7 @@ function declareTie(g: GameState, ids: string[]): GameState {
 /**
  * Raft: a team with raft3 wins at once (several finishing together: more SP,
  * then more stock, else tied). Otherwise, once the last round is revealed,
- * the highest SP wins and a shared top SP is a tie for `startTiebreak`.
+ * `finalWinner` scores the game.
  */
 export function checkWinner(g: GameState): GameState {
   if (g.winnerId !== null || g.phase === "finished" || g.phase === "tiebreak") return g;
@@ -46,12 +46,20 @@ export function checkWinner(g: GameState): GameState {
     return best.length === 1 ? declareWinner(g, best[0].id) : declareTie(g, best.map((t) => t.id));
   }
 
-  if (g.phase === "reveal" && g.roundsPlayed >= ROUNDS[g.length]) {
-    const best = topBy(g.teams, (t) => t.sp);
-    if (best.length === 0) return g;
-    return best.length === 1 ? declareWinner(g, best[0].id) : declareTie(g, best.map((t) => t.id));
-  }
+  if (g.phase === "reveal" && g.roundsPlayed >= ROUNDS[g.length]) return finalWinner(g);
   return g;
+}
+
+/**
+ * Final scoring (spec 7.2): highest SP wins, ties broken by total stock held;
+ * teams equal on both go to `tiedIds` for the tiebreak question. No round or
+ * phase gate, so the teacher can end the game early. No-op once decided.
+ */
+export function finalWinner(g: GameState): GameState {
+  if (g.winnerId !== null || g.phase === "finished") return g;
+  const best = topBy(topBy(g.teams, (t) => t.sp), (t) => stockTotal(t.stock));
+  if (best.length === 0) return g;
+  return best.length === 1 ? declareWinner(g, best[0].id) : declareTie(g, best.map((t) => t.id));
 }
 
 /** Opens a one-question round for the tied teams only. Does not advance roundsPlayed. */
@@ -82,9 +90,8 @@ export function startTiebreak(g: GameState, now: number): GameState {
 }
 
 /**
- * Marks the tiebreak answers. One correct team wins; otherwise the highest
- * stock among the correct teams (or all tied teams if none was correct) wins,
- * and a seeded pick settles any remaining tie.
+ * Marks the tiebreak answers. One correct team wins; otherwise a seeded pick
+ * among the correct teams (or among all tied teams if none was correct).
  */
 export function finishTiebreak(g: GameState): GameState {
   if (g.phase === "finished") return g;
@@ -100,10 +107,12 @@ export function finishTiebreak(g: GameState): GameState {
   const tied = g.teams.filter((t) => g.tiedIds.includes(t.id));
   if (tied.length === 0) throw new GameError("WRONG_PHASE");
   const correct = tied.filter((t) => submissions[t.id]?.correct);
-  const candidates = correct.length >= 1 ? correct : tied;
-  const best = topBy(candidates, (t) => stockTotal(t.stock)).sort((a, b) => idNum(a.id) - idNum(b.id));
+  // Tied teams are already equal on SP and stock, so only the answer and a seeded pick remain.
+  const candidates = (correct.length >= 1 ? correct : tied).sort((a, b) => idNum(a.id) - idNum(b.id));
   const winner =
-    best.length === 1 ? best[0] : best[Math.floor(makeRng(`${g.seed}:tiebreak`)() * best.length)];
+    candidates.length === 1
+      ? candidates[0]
+      : candidates[Math.floor(makeRng(`${g.seed}:tiebreak`)() * candidates.length)];
 
   return declareWinner(g, winner.id, { round: { ...round, submissions } });
 }

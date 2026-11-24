@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ROUNDS } from "@/lib/config";
 import { contribute } from "@/lib/engine/hazard";
 import { revealRound, startRound } from "@/lib/engine/round";
-import { checkWinner, endRoundIfLast, finishTiebreak, startTiebreak } from "@/lib/engine/win";
+import { checkWinner, endRoundIfLast, finalWinner, finishTiebreak, startTiebreak } from "@/lib/engine/win";
 import type { BuildId, GameState, Stock } from "@/lib/types";
 import { captainOf, errCode, revealGame, startedGame, submitAnswer, withTeam } from "../helpers/game";
 
@@ -103,7 +103,18 @@ describe("checkWinner: last round", () => {
     expect(n.log).toContain("winner t2");
   });
 
-  it("equal top SP goes to tiedIds with phase still reveal", () => {
+  it("equal top SP is won by more stock, without a tiebreak", () => {
+    let g = lastReveal(3);
+    g = withTeam(g, "t1", { sp: 5, stock: stock({ wood: 9 }) });
+    g = withTeam(g, "t2", { sp: 5, stock: stock() });
+    g = withTeam(g, "t3", { sp: 4, stock: stock({ wood: 50 }) });
+    const n = checkWinner(g);
+    expect(n.winnerId).toBe("t1");
+    expect(n.phase).toBe("finished");
+    expect(n.tiedIds).toEqual([]);
+  });
+
+  it("equal top SP and equal stock goes to tiedIds with phase still reveal", () => {
     const n = tiedAt([5, 5, 4]);
     expect(n.winnerId).toBeNull();
     expect(n.tiedIds).toEqual(["t1", "t2"]);
@@ -165,9 +176,8 @@ describe("tiebreak", () => {
     expect(errCode(() => answer(s, "t1", true))).toBe("ALREADY_SUBMITTED");
   });
 
-  it("one correct team wins, even with less stock", () => {
+  it("one correct team wins", () => {
     let g = tiedAt([5, 5]);
-    g = withTeam(g, "t1", { stock: stock({ wood: 9 }) });
     g = startTiebreak(g, T);
     g = answer(answer(g, "t1", false), "t2", true);
     const before = frozen(g);
@@ -183,25 +193,32 @@ describe("tiebreak", () => {
     expect(finishTiebreak(n)).toBe(n);
   });
 
-  it("nobody correct (or nobody answering): highest stock among tied teams wins", () => {
-    let g = tiedAt([5, 5, 4]);
-    g = withTeam(g, "t2", { stock: stock({ food: 9 }) });
-    g = withTeam(g, "t3", { stock: stock({ food: 50 }) });
-    g = startTiebreak(g, T);
-    expect(finishTiebreak(answer(g, "t1", false)).winnerId).toBe("t2");
-    expect(finishTiebreak(g).winnerId).toBe("t2");
+  it("nobody correct (or nobody answering): a seeded pick among the tied teams only", () => {
+    const winners = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      const g = startTiebreak(tiedAt([5, 5, 4], `none${i}`), T);
+      const wrong = finishTiebreak(answer(g, "t1", false)).winnerId!;
+      const silent = finishTiebreak(g).winnerId!;
+      expect(["t1", "t2"]).toContain(wrong);
+      expect(silent).toBe(wrong);
+      winners.add(wrong);
+    }
+    expect(winners.size).toBe(2);
   });
 
-  it("several correct: highest stock among the correct teams wins", () => {
-    let g = tiedAt([5, 5, 5]);
-    g = withTeam(g, "t1", { stock: stock({ stone: 9 }) });
-    g = withTeam(g, "t3", { stock: stock({ stone: 20 }) });
-    g = startTiebreak(g, T);
-    g = answer(answer(answer(g, "t1", true), "t2", true), "t3", false);
-    expect(finishTiebreak(g).winnerId).toBe("t1");
+  it("several correct: a seeded pick among the correct teams only", () => {
+    const winners = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      let g = startTiebreak(tiedAt([5, 5, 5], `many${i}`), T);
+      g = answer(answer(answer(g, "t1", true), "t2", false), "t3", true);
+      const w = finishTiebreak(g).winnerId!;
+      expect(["t1", "t3"]).toContain(w);
+      winners.add(w);
+    }
+    expect(winners.size).toBe(2);
   });
 
-  it("still tied on stock: a seeded pick, deterministic and varying by seed", () => {
+  it("both correct: a seeded pick, deterministic and varying by seed", () => {
     const winners = new Set<string>();
     for (let i = 0; i < 20; i++) {
       const g = answer(answer(startTiebreak(tiedAt([5, 5], `seed${i}`), T), "t1", true), "t2", true);
@@ -215,6 +232,43 @@ describe("tiebreak", () => {
 
   it("finishTiebreak rejects other phases", () => {
     expect(errCode(() => finishTiebreak(tiedAt([5, 5])))).toBe("WRONG_PHASE");
+  });
+});
+
+describe("finalWinner", () => {
+  it("declares the SP leader mid-game, with no round-count gate", () => {
+    let g = revealed(3);
+    expect(g.roundsPlayed).toBeLessThan(LAST);
+    g = withTeam(g, "t3", { sp: 2 });
+    const before = frozen(g);
+    const n = finalWinner(g);
+    expect(frozen(g)).toBe(before);
+    expect(n.version).toBe(g.version + 1);
+    expect(n.winnerId).toBe("t3");
+    expect(n.phase).toBe("finished");
+    expect(n.log[n.log.length - 1]).toBe("winner t3");
+  });
+
+  it("breaks an SP tie by total stock", () => {
+    let g = withTeam(withTeam(revealed(2), "t1", { sp: 3 }), "t2", { sp: 3 });
+    g = withTeam(g, "t2", { stock: stock({ water: 3, stone: 6 }) });
+    expect(finalWinner(g).winnerId).toBe("t2");
+  });
+
+  it("equal on SP and stock goes to tiedIds", () => {
+    const g = withTeam(withTeam(revealed(3), "t1", { sp: 3 }), "t3", { sp: 3 });
+    const n = finalWinner(g);
+    expect(n.winnerId).toBeNull();
+    expect(n.tiedIds).toEqual(["t1", "t3"]);
+    expect(n.phase).toBe("reveal");
+    expect(finalWinner(n)).toBe(n);
+  });
+
+  it("is idempotent once a winner is set", () => {
+    const won = finalWinner(withTeam(revealed(2), "t1", { sp: 1 }));
+    expect(finalWinner(won)).toBe(won);
+    const preset = { ...revealed(2), winnerId: "t2" };
+    expect(finalWinner(preset)).toBe(preset);
   });
 });
 
