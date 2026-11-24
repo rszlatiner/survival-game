@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { toPublicState } from "@/lib/engine/public";
 import type { GameState } from "@/lib/types";
 import { VersionConflict, assertIncreasing, type GameRepo } from "./types";
 
@@ -11,7 +10,6 @@ export type DbResult = { data: unknown; error: DbError };
 export interface DbQuery extends PromiseLike<DbResult> {
   eq(col: string, value: unknown): DbQuery;
   lt(col: string, value: string): DbQuery;
-  in(col: string, values: unknown[]): DbQuery;
   select(cols?: string): DbQuery;
   limit(n: number): DbQuery;
   maybeSingle(): PromiseLike<DbResult>;
@@ -22,7 +20,6 @@ export interface SupabaseLike {
   from(table: string): {
     select(cols?: string): DbQuery;
     insert(row: Row): DbQuery;
-    upsert(row: Row): DbQuery;
     update(patch: Row): DbQuery;
     delete(): DbQuery;
   };
@@ -34,10 +31,10 @@ function check(res: DbResult, what: string): unknown {
 }
 
 /**
- * Postgres-backed repo. Must use the service-role key (server only): the
- * `games` table has RLS with no policies, so only the service role can touch
- * it. After every write the sanitised projection goes to `game_public`,
- * which browsers may read and subscribe to via Realtime.
+ * Postgres-backed repo over the single `games` table. Must use the
+ * service-role key (server only): RLS is on with no policies and anon /
+ * authenticated have no privileges, so browsers never read the database.
+ * Every save is one version-guarded UPDATE, so writes cannot land out of order.
  */
 export function supabaseRepo(
   url: string,
@@ -46,11 +43,7 @@ export function supabaseRepo(
   now: () => number = Date.now,
 ): GameRepo {
   const db: SupabaseLike =
-    client ?? (createClient(url, serviceKey, { auth: { persistSession: false } }) as unknown as SupabaseLike);
-
-  async function writePublic(g: GameState) {
-    check(await db.from("game_public").upsert({ code: g.code, state: toPublicState(g, now()) }), "write game_public");
-  }
+    client ?? (createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } }) as unknown as SupabaseLike);
 
   return {
     async create(g) {
@@ -62,7 +55,6 @@ export function supabaseRepo(
       });
       if (res.error?.code === "23505") throw new Error("DUPLICATE_CODE");
       check(res, "create");
-      await writePublic(g);
     },
 
     async get(code) {
@@ -84,7 +76,6 @@ export function supabaseRepo(
         "save",
       ) as Row[] | null;
       if (!rows || rows.length !== 1) throw new VersionConflict(g.code, expectedVersion);
-      await writePublic(g);
     },
 
     async activeCodes() {
@@ -97,9 +88,7 @@ export function supabaseRepo(
       const rows = check(await db.from("games").delete().lt("created_at", cutoff).select("code"), "delete games") as
         | { code: string }[]
         | null;
-      const codes = (rows ?? []).map((r) => r.code);
-      if (codes.length > 0) check(await db.from("game_public").delete().in("code", codes), "delete game_public");
-      return codes.length;
+      return (rows ?? []).length;
     },
 
     async ping() {

@@ -4,10 +4,10 @@ type Row = Record<string, unknown>;
 type Filter = (r: Row) => boolean;
 
 /** Primary key of each fake table. */
-const PK: Record<string, string> = { games: "code", game_public: "code" };
+const PK: Record<string, string> = { games: "code" };
 
 /**
- * A hand-written in-memory stand-in for the subset of the supabase-js client
+ * A hand-written in-memory stand-in (rows are JSON-copied, as jsonb does) for the subset of the supabase-js client
  * that lib/repo/supabase.ts uses. Filtered updates and deletes only touch
  * matching rows; `.select()` after a write returns the affected rows; a
  * duplicate primary key on insert fails with Postgres code 23505.
@@ -27,7 +27,7 @@ export function fakeSupabase() {
     private single = false;
     constructor(
       private name: string,
-      private op: "select" | "insert" | "update" | "upsert" | "delete",
+      private op: "select" | "insert" | "update" | "delete",
       private payload?: Row,
     ) {
       if (op === "select") this.returning = true;
@@ -38,10 +38,6 @@ export function fakeSupabase() {
     }
     lt(col: string, v: string) {
       this.filters.push((r) => Date.parse(String(r[col])) < Date.parse(v));
-      return this;
-    }
-    in(col: string, vs: unknown[]) {
-      this.filters.push((r) => vs.includes(r[col]));
       return this;
     }
     select() {
@@ -60,11 +56,12 @@ export function fakeSupabase() {
       calls.push(`${this.op} ${this.name}`);
       const t = table(this.name);
       const pk = PK[this.name];
-      const copy = (r: Row) => structuredClone(r);
-      if (this.op === "insert" || this.op === "upsert") {
+      // jsonb semantics: what goes in is JSON text, so undefined fields vanish.
+      const copy = (r: Row) => JSON.parse(JSON.stringify(r)) as Row;
+      if (this.op === "insert") {
         const row = copy(this.payload!);
         const key = String(row[pk]);
-        if (this.op === "insert" && t.has(key)) {
+        if (t.has(key)) {
           return { data: null, error: { message: "duplicate key value", code: "23505" } };
         }
         t.set(key, row);
@@ -90,7 +87,6 @@ export function fakeSupabase() {
     from: (name: string) => ({
       select: () => new Query(name, "select"),
       insert: (row: Row) => new Query(name, "insert", row),
-      upsert: (row: Row) => new Query(name, "upsert", row),
       update: (patch: Row) => new Query(name, "update", patch),
       delete: () => new Query(name, "delete"),
     }),

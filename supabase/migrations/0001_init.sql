@@ -4,13 +4,13 @@
 -- and press Run (or, with the Supabase CLI linked to the project, run
 -- `supabase db push`). Run it once on an empty project.
 --
--- Security model:
---   * games holds the full server-side state, including answers and the seed.
---     RLS is on and there are NO policies, so the anon (browser) key can neither
---     read nor write it. The server uses the service-role key, which bypasses RLS.
---   * game_public holds the sanitised projection (lib/engine/public.ts) that the
---     server writes after every change. Browsers may only SELECT it (and receive
---     Realtime changes for it); they cannot insert, update or delete.
+-- Security model: there is one table, games, holding the full server-side
+-- state (answers and seed included). RLS is on, there are NO policies and all
+-- privileges are revoked from anon and authenticated, so the browser (anon)
+-- key cannot read or write anything. Only the server, using the service-role
+-- key (which bypasses RLS), touches it. Browsers get the sanitised state from
+-- a Next.js endpoint and are nudged by a Realtime Broadcast ping, which needs
+-- no table.
 
 create table if not exists public.games (
   code text primary key,
@@ -21,15 +21,6 @@ create table if not exists public.games (
 
 create index if not exists games_created_at_idx on public.games (created_at);
 
-create table if not exists public.game_public (
-  code text primary key references public.games (code) on delete cascade,
-  state jsonb not null
-);
-
 alter table public.games enable row level security;
-alter table public.game_public enable row level security;
 
-create policy "anon can read public game state"
-  on public.game_public for select to anon using (true);
-
-alter publication supabase_realtime add table public.game_public;
+revoke all on public.games from anon, authenticated;

@@ -4,8 +4,8 @@ import type { PublicQuestion, Resource, ZoneId } from "@/lib/questions/types";
 import type { BuildId, GameLength, GameState, Phase, Stock } from "@/lib/types";
 
 /**
- * What any browser may see (it is written to the anon-readable `game_public`
- * table). Never contains the seed, the log, device ids, or team suggestions.
+ * What any browser may see (served by a Next.js endpoint to every player of
+ * the game). Never contains the seed, the log, device ids, or team suggestions.
  * Before reveal (phases "question" and "tiebreak") it also contains no
  * expected answers, solutions, submitted answers or correctness, and nothing
  * marks which choice option is right: `results` is null and `submissions`

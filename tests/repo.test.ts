@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { memoryRepo } from "@/lib/repo/memory";
 import { supabaseRepo } from "@/lib/repo/supabase";
 import { VersionConflict, type GameRepo } from "@/lib/repo/types";
@@ -134,49 +134,38 @@ describe.each(factories)("%s", (_name, make) => {
 });
 
 describe("supabaseRepo specifics", () => {
-  it("writes a sanitised game_public row on create and after every save", async () => {
-    const fake = fakeSupabase();
-    const repo = supabaseRepo("http://unused.invalid", "k", fake.client, () => T0);
-    const g = game("AAA222", T0, questionGame(2));
-    await repo.create(g);
-    const pub1 = fake.table("game_public").get("AAA222")!;
-    expect((pub1.state as { version: number }).version).toBe(g.version);
-
-    const next = { ...g, version: g.version + 1, roundsPlayed: 1 };
-    await repo.save(next, g.version);
-    const pub2 = fake.table("game_public").get("AAA222")!;
-    expect(pub2.state).toMatchObject({ version: next.version, roundsPlayed: 1, serverNow: T0 });
-    const json = JSON.stringify(pub2.state);
-    expect(json).not.toContain('"seed"');
-    expect(json).not.toContain('"log"');
-    for (const q of Object.values(g.round!.questions)) expect(json).not.toContain(q.solution);
-
-    const row = fake.table("games").get("AAA222")!;
-    expect(row.version).toBe(next.version);
-    expect(row.created_at).toBe(new Date(T0).toISOString());
-  });
-
-  it("does not write game_public after a version conflict", async () => {
+  it("stores only the games row, with created_at and version columns", async () => {
     const fake = fakeSupabase();
     const repo = supabaseRepo("http://unused.invalid", "k", fake.client, () => T0);
     const g = game("AAA222", T0);
     await repo.create(g);
-    await repo.save({ ...g, version: g.version + 1 }, g.version);
-    const before = structuredClone(fake.table("game_public").get("AAA222"));
-    await expect(repo.save({ ...g, version: g.version + 2, roundsPlayed: 5 }, g.version)).rejects.toBeInstanceOf(
-      VersionConflict,
-    );
-    expect(fake.table("game_public").get("AAA222")).toStrictEqual(before);
+    await repo.save(bumped(g), g.version);
+    expect([...fake.tables.keys()]).toEqual(["games"]);
+    const row = fake.table("games").get("AAA222")!;
+    expect(row.version).toBe(g.version + 1);
+    expect(row.created_at).toBe(new Date(T0).toISOString());
   });
 
-  it("deleteOlderThan also removes the matching game_public rows", async () => {
+  it("round-trips state the way jsonb does: undefined fields come back without the key", async () => {
     const fake = fakeSupabase();
-    let now = T0;
-    const repo = supabaseRepo("http://unused.invalid", "k", fake.client, () => now);
-    await repo.create(game("OLD222", T0 - DAY));
-    await repo.create(game("NEW444", T0));
-    now = T0 + 1;
-    expect(await repo.deleteOlderThan(DAY)).toBe(1);
-    expect([...fake.table("game_public").keys()]).toEqual(["NEW444"]);
+    const repo = supabaseRepo("http://unused.invalid", "k", fake.client, () => T0);
+    const g = { ...game("AAA222", T0), extra: undefined } as GameState & { extra?: undefined };
+    expect("extra" in g).toBe(true);
+    await repo.create(g);
+    const got = (await repo.get("AAA222"))!;
+    expect("extra" in got).toBe(false);
+    expect(got).toEqual(g);
+  });
+
+  it("builds the real client with no session persistence and no token refresh", async () => {
+    vi.resetModules();
+    const createClient = vi.fn(() => ({}));
+    vi.doMock("@supabase/supabase-js", () => ({ createClient }));
+    const { supabaseRepo: fresh } = await import("@/lib/repo/supabase");
+    fresh("https://x.supabase.co", "service-key");
+    expect(createClient).toHaveBeenCalledWith("https://x.supabase.co", "service-key", {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    vi.doUnmock("@supabase/supabase-js");
   });
 });

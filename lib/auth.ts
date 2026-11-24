@@ -9,6 +9,9 @@ export interface TokenPayload {
 
 export type VerifiedToken = TokenPayload & { exp: number };
 
+/** Shortest accepted HMAC secret (TOKEN_SECRET). */
+export const MIN_SECRET_LENGTH = 32;
+
 /** Tokens longer than this are rejected before any decoding work. */
 const MAX_TOKEN_LENGTH = 4096;
 
@@ -18,6 +21,9 @@ function mac(body: string, secret: string): string {
 
 /** Token = base64url(JSON{...payload, exp}) + "." + base64url(HMAC-SHA256(secret, first part)). */
 export function signToken(payload: TokenPayload, secret: string, ttlMs: number, now: number): string {
+  if (typeof secret !== "string" || secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(`token secret must be at least ${MIN_SECRET_LENGTH} characters`);
+  }
   const body = Buffer.from(JSON.stringify({ ...payload, exp: now + ttlMs })).toString("base64url");
   return `${body}.${mac(body, secret)}`;
 }
@@ -29,7 +35,8 @@ export function signToken(payload: TokenPayload, secret: string, ttlMs: number, 
  */
 export function verifyToken(token: string, secret: string, now: number, expectedCode?: string): VerifiedToken | null {
   try {
-    if (typeof token !== "string" || token.length > MAX_TOKEN_LENGTH || !secret) return null;
+    if (typeof token !== "string" || token.length > MAX_TOKEN_LENGTH) return null;
+    if (typeof secret !== "string" || secret.length < MIN_SECRET_LENGTH) return null;
     const parts = token.split(".");
     if (parts.length !== 2) return null;
     const [body, sig] = parts;

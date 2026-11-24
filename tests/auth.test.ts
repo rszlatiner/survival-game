@@ -1,7 +1,8 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { checkPassword, signToken, verifyToken } from "@/lib/auth";
 
-const SECRET = "test-secret-0123456789";
+const SECRET = "test-secret-0123456789-abcdefghijk"; // 33 chars
 const NOW = 1_000_000;
 const HOUR = 3_600_000;
 
@@ -46,7 +47,7 @@ describe("tokens", () => {
   });
 
   it("rejects a token signed with another secret", () => {
-    const tok = signToken({ role: "host", code: "ABC234" }, "other-secret", HOUR, NOW);
+    const tok = signToken({ role: "host", code: "ABC234" }, "other-secret-0123456789-abcdefghij", HOUR, NOW);
     expect(verifyToken(tok, SECRET, NOW)).toBeNull();
   });
 
@@ -79,6 +80,23 @@ describe("tokens", () => {
     const tok = signToken({ role: "host", code: "ABC234" }, SECRET, HOUR, NOW);
     const sig = tok.split(".")[1];
     expect(verifyToken(`${Buffer.from("not json").toString("base64url")}.${sig}`, SECRET, NOW)).toBeNull();
+  });
+});
+
+describe("secret length", () => {
+  const short = "x".repeat(31);
+  it("signToken throws for a secret shorter than 32 characters", () => {
+    expect(() => signToken({ role: "host", code: "ABC234" }, short, HOUR, NOW)).toThrow();
+    expect(() => signToken({ role: "host", code: "ABC234" }, "", HOUR, NOW)).toThrow();
+    expect(() => signToken({ role: "host", code: "ABC234" }, "x".repeat(32), HOUR, NOW)).not.toThrow();
+  });
+
+  it("verifyToken returns null for a short secret, even on a token made with it", () => {
+    // Build a token with the short secret by hand (signToken refuses to).
+    const body = Buffer.from(JSON.stringify({ role: "host", code: "ABC234", exp: NOW + HOUR })).toString("base64url");
+    const sig = createHmac("sha256", short).update(body).digest("base64url");
+    expect(verifyToken(`${body}.${sig}`, short, NOW)).toBeNull();
+    expect(verifyToken(`${body}.${sig}`, "", NOW)).toBeNull();
   });
 });
 
