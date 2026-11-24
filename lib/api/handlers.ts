@@ -26,6 +26,7 @@ import {
   parseCreateBody,
   parseHostAction,
   parseJoinBody,
+  parseLoginBody,
   parseTeamAction,
   type CreateBody,
   type HostAction,
@@ -164,6 +165,27 @@ export function createGameHandler(
       return { code, hostToken };
     }
     throw new ApiError(409, "CONFLICT");
+  });
+}
+
+/** Teacher signs in again to a running game with the teacher password (lost or expired host token). */
+export function hostLoginHandler(
+  repo: GameRepo,
+  env: HandlerEnv,
+  code: string,
+  password: string,
+  now: number,
+): Promise<{ hostToken: string }> {
+  return guard(async () => {
+    requireSecret(env);
+    if (!env.teacherPassword) throw new ApiError(500, "SERVER_MISCONFIGURED");
+    const c = normalizeCode(code);
+    const b = parseLoginBody({ password });
+    if (!checkPassword(b.password, env.teacherPassword)) throw unauthorized();
+    const g = await repo.get(c);
+    if (!g) throw notFound();
+    const hostToken = signToken({ role: "host", code: c, createdAt: g.createdAt }, env.tokenSecret, TOKEN_TTL_MS, now);
+    return { hostToken };
   });
 }
 

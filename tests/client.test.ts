@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useGameState, type GameStatus } from "@/lib/client/useGameState";
 import type { ChannelFactory, ChannelStatus } from "@/lib/client/realtime";
 import type { PublicGameState } from "@/lib/engine/public";
-import { ClientApiError, joinGame, postHost, postTeam } from "@/lib/client/api";
+import { ClientApiError, hostLogin, joinGame, postHost, postTeam } from "@/lib/client/api";
 import { clearSession, getDeviceId, loadSession, saveSession } from "@/lib/client/storage";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -314,5 +314,26 @@ describe("api", () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body).toEqual({ teamName: "Crabs", deviceId: getDeviceId() });
     expect(loadSession("ABCDEF")).toEqual({ token: "TT", role: "team", deviceId: getDeviceId(), teamId: "t9" });
+  });
+});
+
+describe("hostLogin", () => {
+  it("posts the password and stores the host session", async () => {
+    fetchMock.mockResolvedValue(ok({ hostToken: "NEWTOK" }));
+    await hostLogin("abcdef", "pw");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/games/ABCDEF/login");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ password: "pw" });
+    expect(loadSession("ABCDEF")).toMatchObject({ token: "NEWTOK", role: "host" });
+  });
+
+  it("throws a typed error and stores nothing on a wrong password", async () => {
+    clearSession("ABCDEF");
+    fetchMock.mockResolvedValue(fail(401, { error: "UNAUTHORIZED" }));
+    const err = await hostLogin("ABCDEF", "bad").catch((e) => e);
+    expect(err).toBeInstanceOf(ClientApiError);
+    expect(err.code).toBe("UNAUTHORIZED");
+    expect(loadSession("ABCDEF")).toBeNull();
   });
 });

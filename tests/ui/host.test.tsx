@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublicGameState, PublicTeam } from "@/lib/engine/public";
@@ -14,13 +14,14 @@ const h = vi.hoisted(() => {
       this.code = code;
     }
   }
-  return { ClientApiError, useGameState: vi.fn(), createGame: vi.fn(), postHost: vi.fn(), fetchState: vi.fn() };
+  return { ClientApiError, useGameState: vi.fn(), createGame: vi.fn(), hostLogin: vi.fn(), postHost: vi.fn(), fetchState: vi.fn() };
 });
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/lib/client/useGameState", () => ({ useGameState: h.useGameState }));
 vi.mock("@/lib/client/api", () => ({
   ClientApiError: h.ClientApiError,
   createGame: h.createGame,
+  hostLogin: h.hostLogin,
   postHost: h.postHost,
   fetchState: h.fetchState,
 }));
@@ -300,6 +301,81 @@ describe("host screen", () => {
     await user.selectOptions(await screen.findByLabelText("Captain device for Crabs"), "1");
     await user.click(screen.getByRole("button", { name: /set captain for crabs/i }));
     expect(h.postHost).toHaveBeenCalledWith("ABCDEF", { type: "setCaptain", teamId: "t1", deviceIndex: 1 });
+  });
+});
+
+describe("host re-login", () => {
+  it("logging in with the password restores the host screen and clears the field", async () => {
+    setGame(state());
+    h.hostLogin.mockImplementation(async (code: string) => {
+      saveSession(code, { token: "NEW", role: "host", deviceId: "dev" });
+    });
+    const user = userEvent.setup();
+    render(<HostPlay code="ABCDEF" />);
+    const pw = (await screen.findByLabelText(/teacher password/i)) as HTMLInputElement;
+    expect(pw.type).toBe("password");
+    await user.type(pw, "secret");
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+    expect(h.hostLogin).toHaveBeenCalledWith("ABCDEF", "secret");
+    expect(await screen.findByRole("heading", { name: /host screen/i })).toBeTruthy();
+  });
+
+  it("a wrong password shows a friendly error and empties the field", async () => {
+    setGame(state());
+    h.hostLogin.mockRejectedValue(new h.ClientApiError(401, "UNAUTHORIZED"));
+    const user = userEvent.setup();
+    render(<HostPlay code="ABCDEF" />);
+    const pw = (await screen.findByLabelText(/teacher password/i)) as HTMLInputElement;
+    await user.type(pw, "bad");
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/password was not accepted/i);
+    expect((screen.getByLabelText(/teacher password/i) as HTMLInputElement).value).toBe("");
+  });
+
+  it("the lost-token prompt after a 401 also offers password sign in", async () => {
+    asHost();
+    setGame(state());
+    h.postHost.mockRejectedValue(new h.ClientApiError(401, "UNAUTHORIZED"));
+    h.hostLogin.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<HostPlay code="ABCDEF" />);
+    await user.click(await screen.findByRole("button", { name: /reveal/i }));
+    const pw = await screen.findByLabelText(/teacher password/i);
+    await user.type(pw, "secret");
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+    expect(h.hostLogin).toHaveBeenCalledWith("ABCDEF", "secret");
+    await waitFor(() => expect(screen.queryByLabelText(/teacher password/i)).toBeNull());
+    expect(screen.getByRole("heading", { name: /host screen/i })).toBeTruthy();
+  });
+
+  it("the old copy about creating a game to sign in is gone", async () => {
+    setGame(state());
+    render(<HostPlay code="ABCDEF" />);
+    await screen.findByLabelText(/teacher password/i);
+    expect(screen.queryByText(/sign in by creating a game/i)).toBeNull();
+  });
+});
+
+describe("minor fixes", () => {
+  it("End in reveal with a pending tie uses tiebreak wording", async () => {
+    asHost();
+    setGame(state({ phase: "reveal", tiedIds: ["t1", "t2"] }));
+    const user = userEvent.setup();
+    render(<HostPlay code="ABCDEF" />);
+    await user.click(await screen.findByRole("button", { name: /^end game$/i }));
+    const group = screen.getByRole("group", { name: /confirm end game/i });
+    expect(group.textContent).toMatch(/tiebreak/i);
+    expect(group.textContent).not.toMatch(/final/i);
+  });
+
+  it("clears the password after a successful create", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<CreateGame readiness={readiness} />);
+    await user.type(screen.getByLabelText(/teacher password/i), "pw");
+    await user.click(screen.getByRole("button", { name: /create game/i }));
+    await screen.findByTestId("join-code");
+    expect(container.querySelector("input[type=password]")).toBeNull();
+    expect(h.createGame).toHaveBeenCalled();
   });
 });
 

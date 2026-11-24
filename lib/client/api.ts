@@ -68,6 +68,12 @@ export async function createGame(body: CreateBody): Promise<{ code: string }> {
   return { code: r.code };
 }
 
+/** Teacher signs in again to a running game with the password; stores the host session. */
+export async function hostLogin(code: string, password: string): Promise<void> {
+  const r = await send<{ hostToken: string }>(`${base(code)}/login`, { method: "POST", body: { password } });
+  saveSession(code, { token: r.hostToken, role: "host", deviceId: getDeviceId() });
+}
+
 /** A device creates a team (teamName) or joins one (teamId); stores the team session. */
 export async function joinGame(
   code: string,

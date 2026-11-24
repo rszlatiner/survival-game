@@ -8,6 +8,7 @@ import { MAX_OVERRIDE, ZONES } from "@/lib/config";
 import { RESOURCES, type Resource } from "@/lib/questions/types";
 import { Toast } from "@/components/team/Toast";
 import { RESOURCE_LABEL } from "@/components/team/labels";
+import { HostSignIn } from "./HostSignIn";
 import { hostErrorText, isAuthLost } from "./labels";
 import { useCountdown } from "./useCountdown";
 
@@ -15,6 +16,7 @@ interface Props {
   state: PublicGameState | null;
   status: GameStatus;
   send: (a: HostAction) => Promise<unknown>;
+  login: (code: string, password: string) => Promise<unknown>;
 }
 
 const btn = "min-h-11 rounded-lg px-4 py-2 font-bold disabled:opacity-40";
@@ -25,7 +27,7 @@ function parseCount(raw: string): number | null {
   return n >= 0 && n <= MAX_OVERRIDE ? n : null;
 }
 
-export function HostScreen({ state, status, send }: Props) {
+export function HostScreen({ state, status, send, login }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [authLost, setAuthLost] = useState(false);
@@ -79,8 +81,8 @@ export function HostScreen({ state, status, send }: Props) {
 
   const authPrompt = authLost ? (
     <section role="alert" className="space-y-2 rounded-xl bg-red-900 p-4">
-      <p className="font-bold">Your host session has expired. Sign in again.</p>
-      <a href="/host" className="inline-block rounded-lg bg-white px-4 py-2 font-bold text-black">Sign in again</a>
+      <p className="font-bold">Your host session has expired. Sign in again with the teacher password.</p>
+      <HostSignIn code={state.code} login={login} onSignedIn={() => setAuthLost(false)} />
     </section>
   ) : null;
 
@@ -158,7 +160,9 @@ export function HostScreen({ state, status, send }: Props) {
               <p className="font-bold">
                 {phase === "tiebreak"
                   ? "End the game now? This decides the tiebreak with the answers so far."
-                  : "End the game now? Scores will be final."}
+                  : phase === "reveal" && tied
+                    ? "End the game now? Teams are tied, so this starts the tiebreak question. Ending again during the tiebreak decides it."
+                    : "End the game now? Scores will be final."}
               </p>
               <div className="flex gap-2">
                 <button

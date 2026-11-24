@@ -54,6 +54,7 @@ export function CreateGame({ readiness }: { readiness: UnitReadiness[] }) {
     setError(null);
     try {
       const r = await createGame({ password, units, length, timerSeconds: timerNum });
+      setPassword("");
       setCode(r.code);
     } catch (e) {
       const c = e && typeof e === "object" && "code" in e ? (e as { code: unknown }).code : "";

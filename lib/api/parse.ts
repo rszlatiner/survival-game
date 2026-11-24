@@ -88,6 +88,11 @@ export function parseCreateBody(x: unknown): CreateBody {
   };
 }
 
+export function parseLoginBody(x: unknown): { password: string } {
+  const o = obj(x);
+  return { password: str(o, "password", PASSWORD_MAX) };
+}
+
 export function parseJoinBody(x: unknown): JoinBody {
   const o = obj(x);
   const deviceId = str(o, "deviceId", ID_MAX);

@@ -3,13 +3,14 @@ import {
   ApiError,
   createGameHandler,
   hostActionHandler,
+  hostLoginHandler,
   joinHandler,
   stateHandler,
   teamActionHandler,
   teamSuggestionsHandler,
   type HandlerEnv,
 } from "@/lib/api/handlers";
-import { parseCreateBody, parseHostAction, parseTeamAction } from "@/lib/api/parse";
+import { parseCreateBody, parseHostAction, parseLoginBody, parseTeamAction } from "@/lib/api/parse";
 import { signToken } from "@/lib/auth";
 import { ROUNDS } from "@/lib/config";
 import { checkWinner } from "@/lib/engine/win";
@@ -551,5 +552,54 @@ describe("end during a tiebreak (handler)", () => {
     const b = await hostActionHandler(repo, env, g.code, host, { type: "end" }, T0);
     expect(b.phase).toBe("finished");
     expect(["t1", "t2"]).toContain(b.winnerId);
+  });
+});
+
+describe("host login", () => {
+  it("a correct password returns a host token that works for a host action", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code } = await newGame(repo, env);
+    const { hostToken } = await hostLoginHandler(repo, env, code, PASSWORD, T0 + 1000);
+    const s = await hostActionHandler(repo, env, code, hostToken, { type: "extend", seconds: 5 }, T0 + 1000).catch((e) => e);
+    // extend is WRONG_PHASE in the lobby, but that is an engine error, not an auth error
+    expect(s).toBeInstanceOf(ApiError);
+    expect((s as ApiError).status).toBe(400);
+    const ok = await hostActionHandler(repo, env, code, hostToken, { type: "end" }, T0 + 1000);
+    expect(ok.phase).toBe("finished");
+  });
+
+  it("a wrong password gets the same 401 as create", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code } = await newGame(repo, env);
+    const e = await apiErr(hostLoginHandler(repo, env, code, "nope", T0));
+    expect(e.status).toBe(401);
+    expect(e.code).toBe("UNAUTHORIZED");
+  });
+
+  it("an unknown code is not found", async () => {
+    const { env } = makeEnv();
+    const e = await apiErr(hostLoginHandler(memoryRepo(), env, "ABCDEF", PASSWORD, T0));
+    expect(e.status).toBe(404);
+  });
+
+  it("a token minted for an earlier game with the same code is rejected", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code } = await newGame(repo, env);
+    const { hostToken } = await hostLoginHandler(repo, env, code, PASSWORD, T0);
+    const old = await repo.get(code);
+    const fresh = memoryRepo(() => T0);
+    await fresh.create({ ...old!, createdAt: old!.createdAt + 5 });
+    const e = await apiErr(hostActionHandler(fresh, env, code, hostToken, { type: "end" }, T0));
+    expect(e.status).toBe(401);
+  });
+
+  it("parseLoginBody needs a non-empty string of at most 200 characters", () => {
+    expect(parseLoginBody({ password: "x" })).toEqual({ password: "x" });
+    for (const b of [{}, { password: "" }, { password: "x".repeat(201) }, { password: 5 }, null]) {
+      expect(() => parseLoginBody(b)).toThrow();
+    }
   });
 });
