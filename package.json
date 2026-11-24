@@ -9,7 +9,8 @@
     "start": "next start",
     "test": "vitest run",
     "simulate": "tsx scripts/simulate.ts",
-    "loadcheck": "tsx scripts/loadcheck.ts"
+    "loadcheck": "tsx scripts/loadcheck.ts",
+    "check:no-books": "node scripts/check-no-books.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",
