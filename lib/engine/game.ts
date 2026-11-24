@@ -15,7 +15,12 @@ export type GameErrorCode =
   | "BAD_UNITS"
   | "NOT_CAPTAIN"
   | "ALREADY_SUBMITTED"
-  | "NO_QUESTIONS";
+  | "NO_QUESTIONS"
+  | "CANNOT_AFFORD"
+  | "ALREADY_BUILT"
+  | "MISSING_REQUIREMENT"
+  | "BAD_AMOUNT"
+  | "SAME_RESOURCE";
 
 export class GameError extends Error {
   code: GameErrorCode;
