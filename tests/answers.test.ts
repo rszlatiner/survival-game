@@ -129,6 +129,16 @@ describe("decimal format", () => {
   it("treats comma groups as ambiguous and rejects them", () => {
     expect(parseNumeric("1,000", dec2)).toBeNull();
   });
+  it("rounds .5 ties half away from zero (binary-float safe)", () => {
+    expect(isCorrect("2.68", 2.675, dec2)).toBe(true);
+    expect(isCorrect("2.67", 2.675, dec2)).toBe(false);
+    expect(isCorrect("1.01", 1.005, dec2)).toBe(true);
+    expect(isCorrect("1", 1.005, dec2)).toBe(false);
+    expect(isCorrect("-2.68", -2.675, dec2)).toBe(true);
+    expect(isCorrect("-2.67", -2.675, dec2)).toBe(false);
+    expect(isCorrect("1", 0.5, { kind: "decimal", places: 0 })).toBe(true);
+    expect(isCorrect("-1", -0.5, { kind: "decimal", places: 0 })).toBe(true);
+  });
   it("works with places 0", () => {
     expect(isCorrect("3", 3.4, { kind: "decimal", places: 0 })).toBe(true);
   });

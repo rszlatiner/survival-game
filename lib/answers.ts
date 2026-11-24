@@ -55,6 +55,14 @@ export function parseNumeric(input: string, format: AnswerFormat): number | null
   return v;
 }
 
+/** Decimal-safe rounding: toPrecision(15) strips binary-float noise (2.675 -> "2.67500000000000"). */
+function roundHalfAwayFromZero(x: number, places: number): number {
+  const clean = Number(x.toPrecision(15));
+  const f = 10 ** places;
+  const r = Math.round(Math.abs(clean) * f + 1e-9) / f;
+  return clean < 0 ? -r : r;
+}
+
 function near(a: number, b: number): boolean {
   return Math.abs(a - b) <= EPS * Math.max(1, Math.abs(b));
 }
@@ -70,7 +78,7 @@ export function isCorrect(input: string, expected: number | string, format: Answ
       return v === expected;
     case "decimal": {
       const p = Math.max(0, Math.floor(format.places));
-      return near(v, Number(expected.toFixed(p)));
+      return near(v, roundHalfAwayFromZero(expected, p));
     }
     case "fraction":
       return near(v, expected);
