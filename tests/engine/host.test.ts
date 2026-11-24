@@ -5,7 +5,7 @@ import { addTeam, createGame, joinTeam } from "@/lib/engine/game";
 import { revealRound } from "@/lib/engine/round";
 import { checkRaft, checkWinner } from "@/lib/engine/win";
 import type { GameState, Stock } from "@/lib/types";
-import { errCode, questionGame, revealGame, startedGame, withTeam } from "../helpers/game";
+import { captainOf, errCode, questionGame, submitAnswer, revealGame, startedGame, withTeam } from "../helpers/game";
 
 const stock = (s: Partial<Stock> = {}): Stock => ({ water: 0, food: 0, wood: 0, stone: 0, ...s });
 const frozen = <T,>(x: T) => JSON.stringify(x);
@@ -84,6 +84,9 @@ describe("overrideTeam", () => {
     expect(errCode(() => overrideTeam(g, "t1", { sp: -1 }))).toBe("BAD_AMOUNT");
     expect(errCode(() => overrideTeam(g, "t1", { stock: { water: 1.5 } }))).toBe("BAD_AMOUNT");
     expect(errCode(() => overrideTeam(g, "t9", { sp: 1 }))).toBe("NOT_FOUND");
+    expect(errCode(() => overrideTeam(g, "t1", { sp: 10_000 }))).toBe("BAD_AMOUNT");
+    expect(errCode(() => overrideTeam(g, "t1", { stock: { wood: 10_000 } }))).toBe("BAD_AMOUNT");
+    expect(team(overrideTeam(g, "t1", { sp: 9999, stock: { wood: 9999 } }), "t1").sp).toBe(9999);
   });
 
   it("an empty patch changes nothing", () => {
@@ -144,7 +147,7 @@ describe("endGame", () => {
     expect(e.winnerId).toBe("t1");
   });
 
-  it("an SP and stock tie goes to a tiebreak question; ending again is harmless", () => {
+  it("an SP and stock tie goes to a tiebreak question; ending again decides it", () => {
     const g = revealGame({ teams: 3 });
     let s = g;
     for (const t of g.teams) s = withTeam(s, t.id, { sp: 0, stock: stock({ wood: 1 }) });
@@ -153,7 +156,32 @@ describe("endGame", () => {
     expect(e.phase).toBe("tiebreak");
     expect(e.tiedIds).toEqual(["t1", "t2"]);
     expect(Object.keys(e.round!.questions).sort()).toEqual(["t1", "t2"]);
-    expect(endGame(e, NOW)).toBe(e);
+    const f = endGame(e, NOW);
+    expect(f.phase).toBe("finished");
+    expect(["t1", "t2"]).toContain(f.winnerId);
+    expect(endGame(f, NOW)).toBe(f);
+  });
+
+  it("ending during a tiebreak gives it to the tied team that answered correctly", () => {
+    let s = revealGame({ teams: 2 });
+    for (const t of s.teams) s = withTeam(s, t.id, { sp: 1, stock: stock({ wood: 1 }) });
+    const e = endGame(s, NOW);
+    const right = String(e.round!.questions.t2.expected);
+    const answered = submitAnswer(e, "t2", captainOf(team(e, "t2")), right, NOW + 1);
+    expect(endGame(answered, NOW).winnerId).toBe("t2");
+  });
+
+  it("a raft tie found at the end (tiedIds empty before) starts the tiebreak, not final scoring", () => {
+    let g = revealGame({ teams: 3 });
+    const raft = ["raft1", "raft2", "raft3"] as const;
+    g = withTeam(g, "t1", { builds: [...raft], sp: 3, stock: stock() });
+    g = withTeam(g, "t2", { builds: [...raft], sp: 3, stock: stock() });
+    g = withTeam(g, "t3", { sp: 20, stock: stock({ wood: 9 }) });
+    expect(g.tiedIds).toEqual([]);
+    const e = endGame(g, NOW);
+    expect(e.phase).toBe("tiebreak");
+    expect(e.winnerId).toBeNull();
+    expect(e.tiedIds).toEqual(["t1", "t2"]);
   });
 
   it("a pending raft tie starts the tiebreak without final scoring", () => {

@@ -1,9 +1,9 @@
 import { ALL_TEMPLATES } from "@/content/units";
-import { MAX_ANSWER_LENGTH } from "@/lib/config";
+import { MAX_ANSWER_LENGTH, MAX_OVERRIDE } from "@/lib/config";
 import { GameError } from "@/lib/engine/game";
 import { resolveHazard, resolveRaider } from "@/lib/engine/hazard";
 import { revealRound } from "@/lib/engine/round";
-import { checkRaft, finalWinner, startTiebreak } from "@/lib/engine/win";
+import { checkRaft, finalWinner, finishTiebreak, startTiebreak } from "@/lib/engine/win";
 import { generateQuestion } from "@/lib/questions/generate";
 import { RESOURCES } from "@/lib/questions/types";
 import type { QuestionTemplate } from "@/lib/questions/types";
@@ -16,7 +16,8 @@ function bump(g: GameState, patch: Partial<GameState>): GameState {
   return { ...g, ...patch, version: g.version + 1 };
 }
 
-const isCount = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 0;
+const isCount = (n: unknown): n is number =>
+  typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= MAX_OVERRIDE;
 
 function openRound(g: GameState): RoundState {
   if ((g.phase !== "question" && g.phase !== "tiebreak") || !g.round) throw new GameError("WRONG_PHASE");
@@ -101,15 +102,19 @@ export function overrideTeam(
  * - question: reveals the round first (harvest, then raider).
  * - reveal: settles any hazard; a pending tie (raft or final) goes to the
  *   tiebreak question; otherwise a raft finisher, else the final score, wins.
- * - tiebreak / finished: no-op (the host reveals the tiebreak to finish it).
+ * - tiebreak: decides it now (finishTiebreak: a correct tied team, else a
+ *   seeded pick among the tied teams), exactly as the host's reveal would.
+ * - finished: no-op.
  */
 export function endGame(g: GameState, now: number): GameState {
-  if (g.phase === "finished" || g.phase === "tiebreak") return g;
+  if (g.phase === "finished") return g;
+  if (g.phase === "tiebreak") return finishTiebreak(g);
   if (g.phase === "lobby") return bump(g, { phase: "finished", log: [...g.log, "game ended"] });
 
   let s = g.phase === "question" ? resolveRaider(revealRound(g)) : g;
-  s = resolveHazard(s);
-  if (s.tiedIds.length === 0) s = finalWinner(checkRaft(s));
+  s = checkRaft(resolveHazard(s));
+  // A raft tie (found just now or earlier) goes to the tiebreak: never final scoring.
+  if (s.tiedIds.length === 0) s = finalWinner(s);
   if (s.phase === "reveal" && s.tiedIds.length > 0) return startTiebreak(s, now);
   if (s.phase !== "finished") s = bump(s, { phase: "finished", log: [...s.log, "game ended"] });
   return s;

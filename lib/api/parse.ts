@@ -1,4 +1,4 @@
-import { BUILDS, MAX_ANSWER_LENGTH } from "@/lib/config";
+import { BUILDS, MAX_ANSWER_LENGTH, MAX_OVERRIDE } from "@/lib/config";
 import { RESOURCES } from "@/lib/questions/types";
 import type { Resource } from "@/lib/questions/types";
 import type { BuildId, GameLength, Stock } from "@/lib/types";
@@ -54,9 +54,12 @@ function str(o: Record<string, unknown>, k: string, max: number): string {
   return v as string;
 }
 
+const inRange = (v: unknown, lo: number, hi: number): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi;
+
 function int(o: Record<string, unknown>, k: string, lo: number, hi: number): number {
   const v = o[k];
-  if (typeof v !== "number" || !Number.isInteger(v) || v < lo || v > hi) bad(k);
+  if (!inRange(v, lo, hi)) bad(k);
   return v as number;
 }
 
@@ -78,7 +81,7 @@ export function parseCreateBody(x: unknown): CreateBody {
   const units = o.units;
   if (!Array.isArray(units) || units.length > 15 || !units.every((u) => typeof u === "number")) bad("units");
   return {
-    password: typeof o.password === "string" ? o.password.slice(0, PASSWORD_MAX) : "",
+    password: typeof o.password === "string" && o.password.length <= PASSWORD_MAX ? o.password : bad("password"),
     units: [...(units as number[])],
     length: oneOf(o, "length", ["quick", "standard"] as const),
     timerSeconds: int(o, "timerSeconds", TIMER_MIN_SECONDS, TIMER_MAX_SECONDS),
@@ -96,7 +99,7 @@ export function parseJoinBody(x: unknown): JoinBody {
 
 function answer(o: Record<string, unknown>): string {
   const v = o.answer;
-  if (typeof v !== "string" || v.length > MAX_ANSWER_LENGTH) bad("answer");
+  if (typeof v !== "string" || v.length > MAX_ANSWER_LENGTH || v.trim() === "") bad("answer");
   return v as string;
 }
 
@@ -120,15 +123,12 @@ export function parseHostAction(x: unknown): HostAction {
         const s = obj(o.stock);
         const stock: Partial<Stock> = {};
         for (const [k, v] of Object.entries(s)) {
-          if (!(RESOURCES as readonly string[]).includes(k) || typeof v !== "number") bad("stock");
+          if (!(RESOURCES as readonly string[]).includes(k) || !inRange(v, 0, MAX_OVERRIDE)) bad("stock");
           stock[k as Resource] = v as number;
         }
         out.stock = stock;
       }
-      if (o.sp !== undefined) {
-        if (typeof o.sp !== "number") bad("sp");
-        out.sp = o.sp as number;
-      }
+      if (o.sp !== undefined) out.sp = int(o, "sp", 0, MAX_OVERRIDE);
       return out;
     }
     default:

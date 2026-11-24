@@ -46,3 +46,5 @@ export const MAX_TEAMS = 8;
 export const MAX_DEVICES = 6;
 /** Longest answer or suggestion string accepted from a browser. */
 export const MAX_ANSWER_LENGTH = 40;
+/** Largest stock or SP value a teacher override may set. */
+export const MAX_OVERRIDE = 9999;

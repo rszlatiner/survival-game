@@ -9,7 +9,7 @@ import {
   teamSuggestionsHandler,
   type HandlerEnv,
 } from "@/lib/api/handlers";
-import { parseTeamAction } from "@/lib/api/parse";
+import { parseCreateBody, parseHostAction, parseTeamAction } from "@/lib/api/parse";
 import { signToken } from "@/lib/auth";
 import { ROUNDS } from "@/lib/config";
 import { checkWinner } from "@/lib/engine/win";
@@ -502,5 +502,38 @@ describe("route layer", () => {
     expect(long.status).toBe(400);
     expect(await long.json()).toEqual({ error: "BAD_REQUEST" });
     expect((await POST(post("{not json"), ctx)).status).toBe(400);
+  });
+});
+
+describe("parse", () => {
+  it("rejects empty or whitespace-only submit answers", () => {
+    for (const answer of ["", "   "]) expect(() => parseTeamAction({ type: "submit", answer })).toThrow(ApiError);
+  });
+
+  it("rejects an over-long password instead of truncating it", () => {
+    const body = { units: [11], length: "quick", timerSeconds: 60 };
+    expect(() => parseCreateBody({ ...body, password: "p".repeat(201) })).toThrow(ApiError);
+    expect(parseCreateBody({ ...body, password: "p".repeat(200) }).password).toBe("p".repeat(200));
+  });
+
+  it("bounds override values at 9999", () => {
+    const o = { type: "override", teamId: "t1" };
+    expect(() => parseHostAction({ ...o, sp: 10_000 })).toThrow(ApiError);
+    expect(() => parseHostAction({ ...o, stock: { wood: 10_000 } })).toThrow(ApiError);
+    expect(() => parseHostAction({ ...o, sp: -1 })).toThrow(ApiError);
+    expect(parseHostAction({ ...o, sp: 9999, stock: { wood: 9999 } })).toEqual({ ...o, sp: 9999, stock: { wood: 9999 } });
+  });
+});
+
+describe("end during a tiebreak (handler)", () => {
+  it("end decides the tiebreak instead of silently doing nothing", async () => {
+    let g = revealGame({ teams: 2 });
+    for (const t of g.teams) g = withTeam(g, t.id, { sp: 1, stock: stock({ wood: 1 }) });
+    const { repo, env, host } = await seeded(g);
+    const a = await hostActionHandler(repo, env, g.code, host, { type: "end" }, T0);
+    expect(a.phase).toBe("tiebreak");
+    const b = await hostActionHandler(repo, env, g.code, host, { type: "end" }, T0);
+    expect(b.phase).toBe("finished");
+    expect(["t1", "t2"]).toContain(b.winnerId);
   });
 });
