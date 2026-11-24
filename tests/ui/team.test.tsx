@@ -299,6 +299,84 @@ describe("team screen", () => {
     expect(screen.getByTestId("own-rank").textContent).toMatch(/2/);
   });
 
+  it("tiebreak: non-captain sees no Suggest and no Submit; captain submits and does not poll suggestions", async () => {
+    asDevice(1);
+    setGame(state({ phase: "tiebreak" }));
+    const { unmount } = render(<TeamPlay code="ABCDEF" />);
+    await screen.findByText(/how many fish/i);
+    expect(screen.queryByRole("button", { name: /suggest/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /submit/i })).toBeNull();
+    expect(screen.getByText(/wait for your captain/i)).toBeTruthy();
+    unmount();
+    cleanup();
+    asDevice(0);
+    h.getSuggestions.mockClear();
+    render(<TeamPlay code="ABCDEF" />);
+    expect(await screen.findByRole("button", { name: /submit/i })).toBeTruthy();
+    expect(h.getSuggestions).not.toHaveBeenCalled();
+  });
+
+  it("after the timer expires a non-captain can Submit the typed answer", async () => {
+    asDevice(1);
+    const s = state();
+    s.round!.endsAt = Date.now() - 5_000;
+    setGame(s);
+    const user = userEvent.setup();
+    render(<TeamPlay code="ABCDEF" />);
+    await user.type(await screen.findByLabelText(/your answer/i), "36");
+    expect(screen.queryByRole("button", { name: /suggest/i })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /submit/i }));
+    expect(h.postTeam).toHaveBeenCalledWith("ABCDEF", { type: "submit", answer: "36" });
+  });
+
+  it("uses the server clock offset: expired by server time even if the local clock says otherwise", async () => {
+    asDevice(1);
+    const s = state();
+    s.serverNow = Date.now() + 3_600_000; // server one hour ahead
+    s.round!.endsAt = Date.now() + 1_800_000; // future locally, past by server time
+    setGame(s);
+    render(<TeamPlay code="ABCDEF" />);
+    expect(await screen.findByRole("button", { name: /submit/i })).toBeTruthy();
+  });
+
+  it("captain who has submitted sees the submitted message instead of the form", async () => {
+    asDevice(0);
+    const s = state();
+    s.round!.submissions.t1 = { submitted: true };
+    setGame(s);
+    render(<TeamPlay code="ABCDEF" />);
+    expect(await screen.findByText(/answer submitted/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /submit/i })).toBeNull();
+  });
+
+  it("a transient 409 on rejoin keeps the session; 404 clears it", async () => {
+    asDevice(1);
+    setGame(state());
+    h.joinGame.mockRejectedValue(new h.ClientApiError(409, "CONFLICT"));
+    const { unmount } = render(<TeamPlay code="ABCDEF" />);
+    await screen.findByText(/how many fish/i);
+    expect(loadSession("ABCDEF")).not.toBeNull();
+    unmount();
+    h.joinGame.mockRejectedValue(new h.ClientApiError(404, "NOT_FOUND"));
+    render(<TeamPlay code="ABCDEF" />);
+    await screen.findByRole("button", { name: /find game/i });
+    expect(loadSession("ABCDEF")).toBeNull();
+  });
+
+  it("answer input resets when the round changes even if the prompt repeats", async () => {
+    asDevice(0);
+    const user = userEvent.setup();
+    setGame(state());
+    const { rerender } = render(<TeamPlay code="ABCDEF" />);
+    const input = (await screen.findByLabelText(/your answer/i)) as HTMLInputElement;
+    await user.type(input, "7");
+    const s2 = state({ version: 2 });
+    s2.round!.n = 2;
+    setGame(s2);
+    rerender(<TeamPlay code="ABCDEF" />);
+    await waitFor(() => expect((screen.getByLabelText(/your answer/i) as HTMLInputElement).value).toBe(""));
+  });
+
   it("a stored session auto-rejoins on reload using teamId and shows the screen", async () => {
     asDevice(1);
     setGame(state());

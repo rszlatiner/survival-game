@@ -36,6 +36,8 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
   const phase = state?.phase;
   const round = state?.round ?? null;
   const live = phase === "question" || phase === "tiebreak";
+  // The server only accepts suggestions in the question phase.
+  const suggestPhase = phase === "question";
 
   useEffect(() => {
     if (state) skew.current = state.serverNow - Date.now();
@@ -43,6 +45,7 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
 
   useEffect(() => {
     if (!live) return;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [live]);
@@ -50,7 +53,7 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
   const roundN = round?.n;
   useEffect(() => {
     setSuggestions([]);
-    if (!live || !isCaptain) return;
+    if (!suggestPhase || !isCaptain) return;
     let off = false;
     const poll = () =>
       fetchSuggestions()
@@ -62,7 +65,7 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
       off = true;
       clearInterval(id);
     };
-  }, [live, isCaptain, roundN, fetchSuggestions]);
+  }, [suggestPhase, isCaptain, roundN, fetchSuggestions]);
 
   const act = async (a: TeamAction) => {
     setBusy(true);
@@ -159,6 +162,8 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
                 canSubmit={canSubmit}
                 submitted={submitted}
                 suggestions={suggestions}
+                resetKey={round?.n}
+                canSuggest={suggestPhase}
                 busy={busy}
                 onSend={(answer) => void act({ type: canSubmit ? "submit" : "suggest", answer })}
               />

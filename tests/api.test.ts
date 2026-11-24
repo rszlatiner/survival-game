@@ -117,6 +117,22 @@ describe("auth", () => {
     }
   });
 
+  it("join returns the caller's own deviceIndex, stable on re-join, with no other device ids", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code } = await newGame(repo, env);
+    const a = await joinHandler(repo, env, code, { teamName: "A", deviceId: "capA" }, T0);
+    const m = await joinHandler(repo, env, code, { teamId: a.teamId, deviceId: "mateA" }, T0);
+    const again = await joinHandler(repo, env, code, { teamId: a.teamId, deviceId: "capA" }, T0);
+    expect(a.deviceIndex).toBe(0);
+    expect(m.deviceIndex).toBe(1);
+    expect(again.deviceIndex).toBe(0);
+    for (const r of [a, m, again]) {
+      expect(Object.keys(r).sort()).toEqual(["deviceIndex", "teamId", "teamToken"]);
+      expect(JSON.stringify(r)).not.toMatch(/capA|mateA/);
+    }
+  });
+
   it("a team token cannot call a host action", async () => {
     const repo = memoryRepo();
     const { env } = makeEnv();

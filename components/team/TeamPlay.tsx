@@ -33,7 +33,7 @@ export function TeamPlay({ code: rawCode }: { code: string }) {
       })
       .catch((e: unknown) => {
         if (off) return;
-        if (e instanceof ClientApiError && e.status < 500) {
+        if (e instanceof ClientApiError && (e.status === 401 || e.status === 403 || e.status === 404)) {
           clearSession(code);
           setAuth({ kind: "none" });
         } else {

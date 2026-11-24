@@ -22,18 +22,30 @@ interface Props {
   canSubmit: boolean;
   submitted: boolean;
   suggestions: string[];
+  /** Changes each round so the input resets even if the prompt repeats. */
+  resetKey?: string | number;
+  /** Tiebreak: suggestions are not accepted, so only a submitter gets controls. */
+  canSuggest?: boolean;
   busy: boolean;
   onSend: (answer: string) => void;
 }
 
-export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy, onSend }: Props) {
+export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy, onSend, resetKey, canSuggest = true }: Props) {
   const [value, setValue] = useState("");
-  useEffect(() => setValue(""), [question.prompt]);
+  useEffect(() => setValue(""), [question.prompt, resetKey]);
   const kind = question.format.kind;
   const options = question.format.kind === "choice" ? (question.options ?? question.format.options) : null;
   const verb = canSubmit ? "Submit" : "Suggest";
   const set = (v: string) => setValue(v.slice(0, MAX_ANSWER_LENGTH));
   const empty = value.trim() === "";
+
+  if (!canSubmit && !canSuggest) {
+    return (
+      <p className="rounded-xl bg-slate-800 p-3 text-center text-lg text-white">
+        Tiebreak: wait for your captain to submit, or for the timer to run out.
+      </p>
+    );
+  }
 
   if (submitted && canSubmit) {
     return <p className="rounded-xl bg-emerald-900 p-3 text-center text-lg font-bold text-white">Answer submitted. Wait for the reveal.</p>;
