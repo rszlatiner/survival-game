@@ -349,12 +349,13 @@ export const UNIT_11: QuestionTemplate[] = [
     },
     prompt: ({ g, x, y, m }, zone) =>
       `${Z[zone].Place}, ${g * x} people can cut enough ${Z[zone].wood} for the raft in ${y * m} hours. ` +
-      `A storm is coming, so it must be done in ${x * m} hours. ` +
-      `At the same rate, how many people are needed in total?`,
+      `A storm means it must be done in ${x * m} hours. ` +
+      `At the same rate, how many people must be cutting? Count everyone, including the first ${g * x}.`,
     expected: ({ g, y }) => g * y,
     solution: ({ g, x, y, m }) =>
       `The job is ${g * x} × ${y * m} = ${g * x * y * m} person-hours. ` +
-      `In ${x * m} hours you need ${g * x * y * m} ÷ ${x * m} = ${g * y} people.`,
+      `In ${x * m} hours you need ${g * x * y * m} ÷ ${x * m} = ${g * y} people working, ` +
+      `which is ${g * y - g * x} more than the first ${g * x}.`,
   },
   {
     id: "u11-inverse-choice-01",
@@ -409,9 +410,14 @@ export const UNIT_11: QuestionTemplate[] = [
     difficulty: 3,
     resource: "wood",
     format: INT,
+    // The target c:b must be in lowest terms (never 6:2): step c up until it is coprime with b.
+    // Any 4 consecutive integers include one coprime with b <= 6, so c stays within a+1..a+7.
     params(rng) {
       const [a, b] = coprimePair(rng, 1, 6);
-      return { a, b, k: int(rng, 2, 6), c: a + int(rng, 1, 4) };
+      const k = int(rng, 2, 6);
+      let c = a + int(rng, 1, 4);
+      while (gcd(c, b) !== 1) c++;
+      return { a, b, k, c };
     },
     prompt: ({ a, b, k, c }, zone) =>
       `${Z[zone].Place}, your stockpile has ${Z[zone].wood} and ${Z[zone].stone} in the ratio ${a}:${b}. ` +

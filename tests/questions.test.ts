@@ -299,3 +299,83 @@ describe("unitReadiness", () => {
     expect(unitReadiness(8, ok)).toEqual({ ready: true, count: 12, perDifficulty: { 1: 4, 2: 4, 3: 4 } });
   });
 });
+
+/**
+ * Independent recompute (fix wave): read the numbers a student sees in the
+ * prompt and work the answer out with the test's own formula, never by
+ * calling the template's expected() or solution().
+ */
+describe("independent recompute from the prompt", () => {
+  const hcf = (a: number, b: number): number => (b === 0 ? a : hcf(b, a % b));
+  const nums = (re: RegExp, text: string, where: string) => {
+    const m = re.exec(text);
+    expect(m, `${where}: ${text}`).not.toBeNull();
+    return m!.slice(1).map(Number);
+  };
+  const each = (id: string, check: (prompt: string, expected: number | string, where: string) => void) => {
+    const t = UNIT_11.find((x) => x.id === id)!;
+    for (const zone of ZONE_IDS) {
+      for (let s = 1; s <= 100; s++) {
+        const { publicQ, expected } = generateQuestion(t, zone, String(s));
+        check(publicQ.prompt, expected, `${id} ${zone} seed ${s}`);
+      }
+    }
+  };
+
+  it("u11-ratio-change-01: target ratio in lowest terms, answer = (c - a) x stone / b", () => {
+    each("u11-ratio-change-01", (p, expected, where) => {
+      const [a, b, stone] = nums(/in the ratio (\d+):(\d+)\. You have (\d+) /, p, where);
+      const [c, d] = nums(/make the ratio (\d+):(\d+)\?/, p, where);
+      expect(hcf(a, b), where).toBe(1);
+      expect(hcf(c, d), `${where}: target ${c}:${d} not in lowest terms`).toBe(1);
+      expect(d, where).toBe(b); // the stone part is unchanged
+      expect(c, where).toBeGreaterThan(a);
+      const woodNow = (a * stone) / b;
+      const woodNeeded = (c * stone) / d;
+      expect(expected, where).toBe(woodNeeded - woodNow);
+    });
+  });
+
+  it("u11-inverse-workers-01: unambiguous total workforce, answer = people x hours / new hours", () => {
+    each("u11-inverse-workers-01", (p, expected, where) => {
+      expect(p, where).not.toMatch(/in total/);
+      const [people, hours] = nums(/(\d+) people can cut enough .*? in (\d+) hours/, p, where);
+      const [newHours] = nums(/must be done in (\d+) hours/, p, where);
+      const [counted] = nums(/including the first (\d+)/, p, where);
+      expect(counted, where).toBe(people);
+      expect(expected, where).toBe((people * hours) / newHours);
+    });
+  });
+
+  it("u11-inverse-leave-01: answer = people x days / people left", () => {
+    each("u11-inverse-leave-01", (p, expected, where) => {
+      const [people, days] = nums(/feed (\d+) people for (\d+) days/, p, where);
+      const [leave] = nums(/\. (\d+) (?:person|people) leaves?/, p, where);
+      expect(expected, where).toBe((people * days) / (people - leave));
+    });
+  });
+
+  it("u11-inverse-arrive-01: answer = people x days / (people + arrivals)", () => {
+    each("u11-inverse-arrive-01", (p, expected, where) => {
+      const [people, days] = nums(/will last (\d+) people for (\d+) days/, p, where);
+      const [arrive] = nums(/(\d+) rescued sailors? joins?/, p, where);
+      expect(expected, where).toBe((people * days) / (people + arrive));
+    });
+  });
+
+  it("u11-inverse-choice-01: answer = days x people / new people", () => {
+    each("u11-inverse-choice-01", (p, expected, where) => {
+      const [people, days] = nums(/^(\d+) people take (\d+) days/, p, where);
+      const [more] = nums(/If (\d+) people work/, p, where);
+      expect(expected, where).toBe(`${(days * people) / more} days`);
+    });
+  });
+
+  it("u11-share-ratio-01: answer = total x a / (a + b)", () => {
+    each("u11-share-ratio-01", (p, expected, where) => {
+      const [total] = nums(/catches (\d+) /, p, where);
+      const [a, b] = nums(/in the ratio (\d+):(\d+) \(yours first\)/, p, where);
+      expect(expected, where).toBe((total * a) / (a + b));
+    });
+  });
+});
