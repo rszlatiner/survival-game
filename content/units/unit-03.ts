@@ -59,7 +59,7 @@ export const UNIT_03: QuestionTemplate[] = [
       return (
         `Look at the digit after the ${m === 1 ? "first" : "second"} decimal place: it is ${digit}. ` +
         `${digit >= 5 ? "That is 5 or more, so round up" : "That is less than 5, so round down"}. ` +
-        `${(n / 1000).toFixed(3)} rounds to ${r}.`
+        `${(n / 1000).toFixed(3)} rounds to ${r.toFixed(m)}.`
       );
     },
   },
@@ -87,7 +87,7 @@ export const UNIT_03: QuestionTemplate[] = [
       return { n, k: int(rng, 1, n - 1) };
     },
     prompt: ({ n, k }, zone) =>
-      `${k} of your ${n} ${Z[zone].wood} are damaged by salt water. What percentage is damaged? ${PCT_NOTE}`,
+      `${Z[zone].Place}, ${k} of your ${n} ${Z[zone].wood} ${k === 1 ? "is" : "are"} damaged by salt water. What percentage is damaged? ${PCT_NOTE}`,
     expected: ({ n, k }) => (100 * k) / n,
     solution: ({ n, k }) =>
       `Percentage = part ${DIV} whole ${TIMES} 100. ${k} ${DIV} ${n} ${TIMES} 100 = ${(100 * k) / n}, so ${(100 * k) / n}% is damaged.`,
@@ -246,6 +246,15 @@ export const UNIT_03: QuestionTemplate[] = [
     resource: "wood",
     format: CHOICE,
     params(rng) {
+      if (int(rng, 0, 4) === 0) {
+        // A tie: both teams have the same percentage.
+        for (let i = 0; i < 50; i++) {
+          const n = [20, 25, 50][int(rng, 0, 2)];
+          const m = [20, 25, 50][int(rng, 0, 2)];
+          const a = int(rng, 2, n - 2);
+          if ((a * m) % n === 0 && (a * m) / n >= 2 && (a * m) / n <= m - 2) return { n, m, a, b: (a * m) / n };
+        }
+      }
       for (let i = 0; i < 100; i++) {
         const n = [20, 25, 50][int(rng, 0, 2)];
         const m = [20, 25, 50][int(rng, 0, 2)];
@@ -258,11 +267,11 @@ export const UNIT_03: QuestionTemplate[] = [
     prompt: ({ n, m, a, b }, zone) =>
       `Team A gathered ${a} of ${n} ${Z[zone].wood}. Team B gathered ${b} of ${m}. Which team gathered the larger percentage?`,
     options: () => ["Team A", "Team B", "They are equal"],
-    expected: ({ n, m, a, b }) => (a * m > b * n ? "Team A" : "Team B"),
+    expected: ({ n, m, a, b }) => (a * m === b * n ? "They are equal" : a * m > b * n ? "Team A" : "Team B"),
     solution: ({ n, m, a, b }) => {
       const pa = (100 * a) / n;
       const pb = (100 * b) / m;
-      return `Team A: ${a} ${DIV} ${n} ${TIMES} 100 = ${pa}%. Team B: ${b} ${DIV} ${m} ${TIMES} 100 = ${pb}%. ${pa > pb ? "Team A" : "Team B"} has the larger percentage.`;
+      return `Team A: ${a} ${DIV} ${n} ${TIMES} 100 = ${pa}%. Team B: ${b} ${DIV} ${m} ${TIMES} 100 = ${pb}%. ${pa === pb ? "They are equal: the percentages match." : `${pa > pb ? "Team A" : "Team B"} has the larger percentage.`}`;
     },
   },
   {
@@ -271,7 +280,14 @@ export const UNIT_03: QuestionTemplate[] = [
     difficulty: 2,
     resource: "water",
     format: D2,
-    params: (rng) => ({ A: int(rng, 11, 49), B: int(rng, 12, 48) }),
+    params(rng) {
+      for (let i = 0; i < 100; i++) {
+        const A = int(rng, 11, 49);
+        const B = int(rng, 12, 48);
+        if (A % 10 !== 0 && B % 10 !== 0) return { A, B };
+      }
+      return { A: 18, B: 41 };
+    },
     prompt: ({ A, B }, zone) =>
       `${Z[zone].Place}, a spring gives ${A / 10} litres of ${Z[zone].water} every minute. How many litres does it give in ${B / 10} minutes?`,
     expected: ({ A, B }) => (A * B) / 100,
@@ -382,7 +398,7 @@ export const UNIT_03: QuestionTemplate[] = [
       };
     },
     prompt: (_p, zone) =>
-      `${Z[zone].Place}, four crews each moved a share of the pile of ${Z[zone].stone}. Which share is the greatest?`,
+      `${Z[zone].Place}, four crews each moved a share of their own separate pile of ${Z[zone].stone}. Which share is the greatest?`,
     options: ({ a, b, c, d, fa, fb, fc, fd }) => [shareText(a, fa), shareText(b, fb), shareText(c, fc), shareText(d, fd)],
     expected: ({ a, b, c, d, fa, fb, fc, fd }) => {
       const all = [[a, fa], [b, fb], [c, fc], [d, fd]];
@@ -393,7 +409,7 @@ export const UNIT_03: QuestionTemplate[] = [
       const all = [[a, fa], [b, fb], [c, fc], [d, fd]];
       const best = all.reduce((m, x) => (x[0] > m[0] ? x : m));
       return (
-        `Change every share to a percentage: ${all.map(([v, f]) => `${shareText(v, f)} = ${v}%`).join(", ")}. ` +
+        `Change every share to a percentage: ${all.map(([v, f]) => (f === 0 ? `${v}%` : `${shareText(v, f)} = ${v}%`)).join(", ")}. ` +
         `The greatest is ${best[0]}%, which is ${shareText(best[0], best[1])}.`
       );
     },

@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_03 } from "@/content/units/unit-03";
-import { bankChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, eachQuestion, numsIn } from "./helpers/bank";
 
 bankChecks(3, UNIT_03);
+overlapChecks(UNIT_03);
 
 const get = (id: string) => UNIT_03.find((t) => t.id === id)!;
 /** Round half up at a decimal place using exact whole-number arithmetic on a decimal string. */
@@ -22,6 +23,22 @@ describe("unit 3 independent recompute", () => {
     eachQuestion(get(id), ({ publicQ, expected }, where) => check(publicQ.prompt, expected, publicQ.options, where));
   const close = (a: number, b: number) => Math.abs(a - b) < 1e-9;
 
+  it("round-dp-01: solution shows trailing zeros", () => {
+    const t = get("u03-round-dp-01");
+    eachQuestion(t, ({ publicQ, expected, solution }, where) => {
+      const dp = Number(/to (\d) decimal place/.exec(publicQ.prompt)![1]);
+      expect(solution, where).toContain(`rounds to ${Number(expected).toFixed(dp)}.`);
+    });
+  });
+  it("decimal-mult-02: each number really has one decimal place, as the solution says", () => {
+    const t = get("u03-decimal-mult-02");
+    eachQuestion(t, ({ publicQ, solution }, where) => {
+      const ds = publicQ.prompt.match(/\d+\.\d+/g)!;
+      expect(ds, where).toHaveLength(2);
+      for (const d of ds) expect(d.split(".")[1], where).toMatch(/^[1-9]$/);
+      expect(solution, where).toContain("1 decimal place in each number");
+    });
+  });
   it("round-dp-01", () =>
     run("u03-round-dp-01", (p, e, _o, where) => {
       const len = /of length (\d\.\d{3}) m/.exec(p)![1];
@@ -90,8 +107,7 @@ describe("unit 3 independent recompute", () => {
   it("compare-percent-01", () =>
     run("u03-compare-percent-01", (p, e) => {
       const [a, n, b, m] = numsIn(p.replace("Team A", "").replace("Team B", ""));
-      expect(a / n).not.toBe(b / m);
-      expect(e).toBe(a / n > b / m ? "Team A" : "Team B");
+      expect(e).toBe(a * m === b * n ? "They are equal" : a / n > b / m ? "Team A" : "Team B");
     }));
   it("decimal-mult-02", () =>
     run("u03-decimal-mult-02", (p, e) => {
