@@ -28,6 +28,47 @@ function words(s: string): string[] {
   return s.split(/\s+/).filter(Boolean);
 }
 
+
+/** Token multiset of an option, for the overlap check. */
+function tokens(o: string): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const t of o.match(/\d+|[^\s\d]/g) ?? []) m.set(t, (m.get(t) ?? 0) + 1);
+  return m;
+}
+function sim(a: Map<string, number>, b: Map<string, number>): number {
+  let inter = 0, uni = 0;
+  for (const k of new Set([...a.keys(), ...b.keys()])) {
+    const x = a.get(k) ?? 0, y = b.get(k) ?? 0;
+    inter += Math.min(x, y);
+    uni += Math.max(x, y);
+  }
+  return uni === 0 ? 0 : inter / uni;
+}
+const ALGEBRAIC = /(\d|\s|\()[xynrLT](?![a-z])|[xynrLT]\s*[\u00b2)=<>\u2264\u2265]|^[xnLT] /;
+
+/** For choice templates with algebraic options, the key must not be the "centre" option (most similar to the rest). */
+export function overlapChecks(bank: QuestionTemplate[]) {
+  describe("option overlap does not reveal the key", () => {
+    for (const t of bank.filter((x) => x.format.kind === "choice")) {
+      it(`${t.id}`, () => {
+        let n = 0, share = 0, algebraic = true;
+        eachQuestion(t, ({ publicQ, expected }) => {
+          const opts = publicQ.options!;
+          if (!opts.every((o) => ALGEBRAIC.test(o))) algebraic = false;
+          const tk = opts.map(tokens);
+          const score = tk.map((a, i) => tk.reduce((acc, b, j) => (i === j ? acc : acc + sim(a, b)), 0));
+          const k = opts.indexOf(expected as string);
+          const best = Math.max(...score);
+          const ties = score.filter((v) => Math.abs(v - best) < 1e-9).length;
+          n++;
+          if (Math.abs(score[k] - best) < 1e-9) share += 1 / ties;
+        }, SEEDS_200.slice(0, 100));
+        if (algebraic) expect(share / n, "key is the max-overlap option too often").toBeLessThanOrEqual(0.6);
+      });
+    }
+  });
+}
+
 /** Structural checks shared by every unit bank. */
 export function bankChecks(unit: number, bank: QuestionTemplate[]) {
   const nn = String(unit).padStart(2, "0");
