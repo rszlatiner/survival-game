@@ -1,12 +1,13 @@
 /**
  * Unit 6 bank: statistical investigations.
  * Original templates written for this game. Difficulty 1 = one statistic from
- * a short list (mean, median, mode, range), a pie-chart angle, naming a type of
- * data; 2 = even-sized median, frequency tables, missing values, comparing
- * spreads, sampling, two-way tables, stem and leaf; 3 = combining and
- * changing means, medians from frequency tables, choosing an average,
- * multi-step pie charts and reasoning from several averages. There are no
- * figures, so every data set and table is written out in the prompt.
+ * a short list (median, mode, range), a pie-chart angle, naming a type of data
+ * or a data source; 2 = frequency tables, even-sized medians, comparing
+ * spreads, sampling and bias, systematic sampling, two-way tables, stem and
+ * leaf, pie-chart counts; 3 = changing and combining means, medians from
+ * frequency tables, choosing an average, estimating from a sample, reasoning
+ * from several averages. There are no figures, so every data set and table is
+ * written out in the prompt.
  */
 import type { QuestionTemplate } from "@/lib/questions/types";
 import { int, pick } from "@/lib/questions/random";
@@ -32,44 +33,40 @@ const PIE_N = [12, 15, 18, 20, 24, 30, 36, 40, 45, 60];
 const TYPES = ["Categorical", "Discrete", "Continuous"];
 const AVERAGES = ["The mean", "The median", "The mode", "The range"];
 
+/** Store a list as params under a prefix (v0, v1, ...). */
+function pack(prefix: string, a: number[]): Record<string, number> {
+  return Object.fromEntries(a.map((v, i) => [`${prefix}${i}`, v]));
+}
+function unpack(p: Record<string, number>, prefix: string, n: number): number[] {
+  return Array.from({ length: n }, (_, i) => p[`${prefix}${i}`]);
+}
+function medianOfTable(fs: number[]): number {
+  const n = sum(fs);
+  const target = (n + 1) / 2;
+  let run = 0;
+  for (let i = 0; i < fs.length; i++) {
+    run += fs[i];
+    if (run >= target) return i + 1;
+  }
+  return fs.length;
+}
+
 export const UNIT_06: QuestionTemplate[] = [
   // ---------------- Difficulty 1 ----------------
-  {
-    id: "u06-mean-01",
-    unit: 6,
-    difficulty: 1,
-    resource: "food",
-    format: INT,
-    params(rng) {
-      const m = int(rng, 8, 20);
-      for (let i = 0; i < 60; i++) {
-        const d = [0, 1, 2, 3].map(() => int(rng, -4, 4));
-        const last = -sum(d);
-        if (Math.abs(last) <= 6) return { v1: m + d[0], v2: m + d[1], v3: m + d[2], v4: m + d[3], v5: m + last, m };
-      }
-      return { v1: m, v2: m, v3: m, v4: m, v5: m, m };
-    },
-    prompt: ({ v1, v2, v3, v4, v5 }, zone) =>
-      `${Z[zone].Place}, you land ${v1}, ${v2}, ${v3}, ${v4} and ${v5} ${Z[zone].food} on five days. What is the mean number per day?`,
-    expected: ({ m }) => m,
-    solution: ({ v1, v2, v3, v4, v5, m }) =>
-      `Add the values: ${v1} + ${v2} + ${v3} + ${v4} + ${v5} = ${v1 + v2 + v3 + v4 + v5}. Divide by how many there are: ${v1 + v2 + v3 + v4 + v5} ÷ 5 = ${m}.`,
-  },
   {
     id: "u06-median-odd-01",
     unit: 6,
     difficulty: 1,
     resource: "stone",
     format: INT,
-    params(rng) {
-      const v = Array.from({ length: 7 }, () => int(rng, 3, 40));
-      return { a: v[0], b: v[1], c: v[2], d: v[3], e: v[4], f: v[5], g: v[6] };
+    params: (rng) => pack("v", Array.from({ length: 7 }, () => int(rng, 3, 40))),
+    prompt: (p, zone) =>
+      `${Z[zone].Place}, seven coconuts are weighed in grams: ${list(unpack(p, "v", 7))}. What is the median mass in grams?`,
+    expected: (p) => sorted(unpack(p, "v", 7))[3],
+    solution: (p) => {
+      const s = sorted(unpack(p, "v", 7));
+      return `Put the values in order: ${list(s)}. With 7 values the median is the middle (4th) one: ${s[3]}.`;
     },
-    prompt: ({ a, b, c, d, e, f, g }, zone) =>
-      `Seven ${Z[zone].stone} are weighed in grams: ${a}, ${b}, ${c}, ${d}, ${e}, ${f}, ${g}. What is the median mass in grams?`,
-    expected: ({ a, b, c, d, e, f, g }) => sorted([a, b, c, d, e, f, g])[3],
-    solution: ({ a, b, c, d, e, f, g }) =>
-      `Put the values in order: ${list(sorted([a, b, c, d, e, f, g]))}. With 7 values the median is the middle (4th) one: ${sorted([a, b, c, d, e, f, g])[3]}.`,
   },
   {
     id: "u06-mode-01",
@@ -78,14 +75,11 @@ export const UNIT_06: QuestionTemplate[] = [
     resource: "wood",
     format: INT,
     params(rng) {
-      const pool = shuffled(rng, Array.from({ length: 15 }, (_, i) => i + 1));
-      const [m, a, b, c, d] = pool;
-      return { m, a, b, c, d, o: int(rng, 0, 8) };
+      const [m, a, b, c, d] = shuffled(rng, Array.from({ length: 15 }, (_, i) => i + 1));
+      return { m, a, ...pack("v", shuffled(rng, [m, m, m, a, a, b, c, d])) };
     },
-    prompt: ({ m, a, b, c, d, o }, zone) => {
-      const data = shuffled(seedOrder(o), [m, m, m, a, a, b, c, d]);
-      return `The number of ${Z[zone].wood} you gather on eight trips is ${list(data)}. What is the mode?`;
-    },
+    prompt: (p, zone) =>
+      `The number of ${Z[zone].wood} you gather on eight trips is ${list(unpack(p, "v", 8))}. What is the mode?`,
     expected: ({ m }) => m,
     solution: ({ m, a }) =>
       `The mode is the value that appears most often. ${m} appears 3 times and no other value appears more than twice (${a} appears twice), so the mode is ${m}.`,
@@ -99,13 +93,12 @@ export const UNIT_06: QuestionTemplate[] = [
     params(rng) {
       const lo = int(rng, 5, 20);
       const hi = lo + int(rng, 6, 25);
-      return { lo, hi, a: int(rng, lo, hi), b: int(rng, lo, hi), c: int(rng, lo, hi), d: int(rng, lo, hi), o: int(rng, 0, 8) };
+      return { lo, hi, ...pack("v", shuffled(rng, [lo, int(rng, lo, hi), int(rng, lo, hi), hi, int(rng, lo, hi), int(rng, lo, hi)])) };
     },
-    prompt: ({ lo, hi, a, b, c, d, o }, zone) =>
-      `Litres of ${Z[zone].water} collected on six days: ${list(shuffled(seedOrder(o), [lo, a, b, hi, c, d]))}. What is the range?`,
+    prompt: (p, zone) =>
+      `Litres of ${Z[zone].water} collected on six days: ${list(unpack(p, "v", 6))}. What is the range?`,
     expected: ({ lo, hi }) => hi - lo,
-    solution: ({ lo, hi }) =>
-      `The range is the largest value minus the smallest: ${hi} ${M} ${lo} = ${hi - lo}.`,
+    solution: ({ lo, hi }) => `The range is the largest value minus the smallest: ${hi} ${M} ${lo} = ${hi - lo}.`,
   },
   {
     id: "u06-pie-angle-01",
@@ -147,8 +140,53 @@ export const UNIT_06: QuestionTemplate[] = [
         "Times are measured and can take any value in a range, such as 12.37 seconds, so it is Continuous.",
       ][k],
   },
+  {
+    id: "u06-data-source-01",
+    unit: 6,
+    difficulty: 1,
+    resource: "food",
+    format: CHOICE,
+    params: (rng) => ({ n: int(rng, 12, 48) }),
+    prompt: ({ n }, zone) =>
+      `${Z[zone].Place}, you plan to study ${n} items. Which way of getting the data gives primary data, collected by you?`,
+    options: ({ n }) => [
+      `You measure ${n} shells with a ruler`,
+      `You copy ${n} tide times from a chart`,
+      `You read ${n} counts in a report`,
+      `You use ${n} figures from the old diary`,
+    ],
+    expected: ({ n }) => `You measure ${n} shells with a ruler`,
+    solution: ({ n }) =>
+      `Primary data is data you collect yourself. Measuring ${n} shells with a ruler is collecting it yourself: You measure ${n} shells with a ruler. ` +
+      `Charts, reports and diaries already exist, so they give secondary data.`,
+  },
 
   // ---------------- Difficulty 2 ----------------
+  {
+    id: "u06-freq-mean-01",
+    unit: 6,
+    difficulty: 2,
+    resource: "food",
+    format: INT,
+    params(rng) {
+      const v = int(rng, 1, 6);
+      for (let i = 0; i < 300; i++) {
+        const f = [0, 1, 2, 3].map(() => int(rng, 1, 8));
+        const extra = f[1] + 2 * f[2] + 3 * f[3];
+        if (extra % sum(f) === 0) return { v, f1: f[0], f2: f[1], f3: f[2], f4: f[3] };
+      }
+      return { v, f1: 2, f2: 3, f3: 3, f4: 2 };
+    },
+    prompt: ({ v, f1, f2, f3, f4 }, zone) =>
+      `You checked baskets of ${Z[zone].food}. The frequencies for ${v}, ${v + 1}, ${v + 2} and ${v + 3} items per basket are ${f1}, ${f2}, ${f3} and ${f4} baskets. ` +
+      `What is the mean number of items per basket?`,
+    expected: ({ v, f1, f2, f3, f4 }) => (v * f1 + (v + 1) * f2 + (v + 2) * f3 + (v + 3) * f4) / (f1 + f2 + f3 + f4),
+    solution: ({ v, f1, f2, f3, f4 }) => {
+      const total = v * f1 + (v + 1) * f2 + (v + 2) * f3 + (v + 3) * f4;
+      const n = f1 + f2 + f3 + f4;
+      return `Total items = ${v}×${f1} + ${v + 1}×${f2} + ${v + 2}×${f3} + ${v + 3}×${f4} = ${total}. Number of baskets = ${f1} + ${f2} + ${f3} + ${f4} = ${n}. Mean = ${total} ÷ ${n} = ${total / n}.`;
+    },
+  },
   {
     id: "u06-median-even-01",
     unit: 6,
@@ -159,67 +197,20 @@ export const UNIT_06: QuestionTemplate[] = [
       for (let i = 0; i < 100; i++) {
         const v = Array.from({ length: 6 }, () => int(rng, 4, 40));
         const s = sorted(v);
-        if ((s[2] + s[3]) % 2 === 0) return { a: v[0], b: v[1], c: v[2], d: v[3], e: v[4], f: v[5] };
+        if ((s[2] + s[3]) % 2 === 0) return pack("v", v);
       }
-      return { a: 10, b: 14, c: 8, d: 20, e: 16, f: 12 };
+      return pack("v", [10, 14, 8, 20, 16, 12]);
     },
-    prompt: ({ a, b, c, d, e, f }, zone) =>
-      `Six water pots ${Z[zone].place} hold ${a}, ${b}, ${c}, ${d}, ${e} and ${f} litres. What is the median volume, in litres?`,
-    expected: ({ a, b, c, d, e, f }) => {
-      const s = sorted([a, b, c, d, e, f]);
+    prompt: (p, zone) =>
+      `Six water pots ${Z[zone].place} hold ${list(unpack(p, "v", 6))} litres. What is the median volume, in litres?`,
+    expected: (p) => {
+      const s = sorted(unpack(p, "v", 6));
       return (s[2] + s[3]) / 2;
     },
-    solution: ({ a, b, c, d, e, f }) => {
-      const s = sorted([a, b, c, d, e, f]);
+    solution: (p) => {
+      const s = sorted(unpack(p, "v", 6));
       return `In order: ${list(s)}. With 6 values the median is halfway between the 3rd and 4th: (${s[2]} + ${s[3]}) ÷ 2 = ${(s[2] + s[3]) / 2}.`;
     },
-  },
-  {
-    id: "u06-freq-mean-01",
-    unit: 6,
-    difficulty: 2,
-    resource: "food",
-    format: INT,
-    params(rng) {
-      for (let i = 0; i < 200; i++) {
-        const f = [1, 2, 3, 4].map(() => int(rng, 1, 8));
-        const n = sum(f);
-        const t = f[0] + 2 * f[1] + 3 * f[2] + 4 * f[3];
-        if (t % n === 0) return { f1: f[0], f2: f[1], f3: f[2], f4: f[3] };
-      }
-      return { f1: 2, f2: 3, f3: 3, f4: 2 };
-    },
-    prompt: ({ f1, f2, f3, f4 }, zone) =>
-      `You checked baskets of ${Z[zone].food}. The frequencies for 1, 2, 3 and 4 items per basket are ${f1}, ${f2}, ${f3} and ${f4} baskets. ` +
-      `What is the mean number of items per basket?`,
-    expected: ({ f1, f2, f3, f4 }) => (f1 + 2 * f2 + 3 * f3 + 4 * f4) / (f1 + f2 + f3 + f4),
-    solution: ({ f1, f2, f3, f4 }) =>
-      `Total items = 1×${f1} + 2×${f2} + 3×${f3} + 4×${f4} = ${f1 + 2 * f2 + 3 * f3 + 4 * f4}. ` +
-      `Number of baskets = ${f1} + ${f2} + ${f3} + ${f4} = ${f1 + f2 + f3 + f4}. ` +
-      `Mean = ${f1 + 2 * f2 + 3 * f3 + 4 * f4} ÷ ${f1 + f2 + f3 + f4} = ${(f1 + 2 * f2 + 3 * f3 + 4 * f4) / (f1 + f2 + f3 + f4)}.`,
-  },
-  {
-    id: "u06-missing-value-01",
-    unit: 6,
-    difficulty: 2,
-    resource: "wood",
-    format: INT,
-    params(rng) {
-      const m = int(rng, 10, 24);
-      for (let i = 0; i < 60; i++) {
-        const v = [0, 1, 2, 3].map(() => m + int(rng, -6, 6));
-        const last = 5 * m - sum(v);
-        if (last >= 2) return { a: v[0], b: v[1], c: v[2], d: v[3], m, e: last };
-      }
-      return { a: m, b: m, c: m, d: m, m, e: m };
-    },
-    prompt: ({ a, b, c, d, m }, zone) =>
-      `Over five days you collect ${a}, ${b}, ${c} and ${d} ${Z[zone].wood} on the first four days. ` +
-      `The mean for all five days is ${m}. How many do you collect on the fifth day?`,
-    expected: ({ e }) => e,
-    solution: ({ a, b, c, d, m, e }) =>
-      `A mean of ${m} over 5 days means a total of 5 × ${m} = ${5 * m}. The first four days give ${a + b + c + d}. ` +
-      `So the fifth day is ${5 * m} ${M} ${a + b + c + d} = ${e}.`,
   },
   {
     id: "u06-compare-range-01",
@@ -229,43 +220,26 @@ export const UNIT_06: QuestionTemplate[] = [
     format: CHOICE,
     params(rng) {
       const ranges = shuffled(rng, [2, 4, 6, 8, 10, 12]).slice(0, 3);
-      const p: Record<string, number> = { o: int(rng, 0, 8) };
+      const p: Record<string, number> = {};
       ranges.forEach((r, i) => {
         const lo = int(rng, 5, 20);
-        [lo, lo + int(rng, 0, r), lo + int(rng, 0, r), lo + r].forEach((v, j) => (p[`g${i}${j}`] = v));
+        shuffled(rng, [lo, lo + int(rng, 0, r), lo + int(rng, 0, r), lo + r]).forEach((v, j) => (p[`g${i}${j}`] = v));
       });
       return p;
     },
     prompt: (p, zone) => {
-      const grp = (i: number) => list(shuffled(seedOrder(p.o + i), rowOf(p, i)));
+      const grp = (i: number) => list([0, 1, 2, 3].map((j) => p[`g${i}${j}`]));
       return `Three crews log ${Z[zone].food} caught on 4 days. Crew A: ${grp(0)}. Crew B: ${grp(1)}. Crew C: ${grp(2)}. Which crew's catches are the most consistent (smallest range)?`;
     },
     options: () => ["Crew A", "Crew B", "Crew C"],
     expected: (p) => {
-      const r = [0, 1, 2].map((i) => Math.max(...rowOf(p, i)) - Math.min(...rowOf(p, i)));
+      const r = [0, 1, 2].map((i) => rangeOf(p, i));
       return ["Crew A", "Crew B", "Crew C"][r.indexOf(Math.min(...r))];
     },
     solution: (p) => {
-      const r = [0, 1, 2].map((i) => Math.max(...rowOf(p, i)) - Math.min(...rowOf(p, i)));
+      const r = [0, 1, 2].map((i) => rangeOf(p, i));
       return `The range is largest minus smallest. Crew A: ${r[0]}. Crew B: ${r[1]}. Crew C: ${r[2]}. The smallest range is the most consistent: ${["Crew A", "Crew B", "Crew C"][r.indexOf(Math.min(...r))]}.`;
     },
-  },
-  {
-    id: "u06-pie-reverse-01",
-    unit: 6,
-    difficulty: 2,
-    resource: "water",
-    format: INT,
-    params(rng) {
-      const n = pick(rng, PIE_N);
-      return { n, f: int(rng, 2, n / 2 - 1) };
-    },
-    prompt: ({ n, f }, zone) =>
-      `A pie chart shows the favourite drink of ${n} islanders. The ${Z[zone].water} sector has an angle of ${(360 / n) * f}°. ` +
-      `How many islanders chose ${Z[zone].water}?`,
-    expected: ({ f }) => f,
-    solution: ({ n, f }) =>
-      `One islander is 360 ÷ ${n} = ${360 / n}° of the circle. The sector is ${(360 / n) * f}°, so ${(360 / n) * f} ÷ ${360 / n} = ${f} islanders.`,
   },
   {
     id: "u06-sample-01",
@@ -273,19 +247,33 @@ export const UNIT_06: QuestionTemplate[] = [
     difficulty: 2,
     resource: "food",
     format: CHOICE,
-    params: (rng) => ({ total: int(rng, 60, 200), s: int(rng, 8, 20) }),
-    prompt: ({ total, s }, zone) =>
-      `${Z[zone].Place}, you want to know which food all ${total} islanders like best, but you can only ask ${s} people. Which method gives the fairest sample?`,
-    options: ({ s }) => [
-      `Pick ${s} names at random from a list`,
-      `Ask the ${s} people sitting nearest you`,
-      `Ask ${s} of your friends`,
-      `Ask the ${s} who volunteer first`,
-    ],
-    expected: ({ s }) => `Pick ${s} names at random from a list`,
-    solution: ({ s, total }) =>
-      `A fair sample gives every one of the ${total} islanders an equal chance of being chosen. Picking names at random from a list of everyone does this; the other methods favour certain people. ` +
-      `So the best choice is: Pick ${s} names at random from a list.`,
+    params: (rng) => ({ k: int(rng, 0, 1), total: int(rng, 60, 200), s: int(rng, 8, 20) }),
+    prompt: ({ k, total, s }, zone) =>
+      k === 0
+        ? `${Z[zone].Place}, you want to know which food all ${total} islanders like best, but you can only ask ${s} people. Which method gives the fairest sample?`
+        : `${Z[zone].Place}, you want to know if all ${total} islanders want more time fishing, and you can ask ${s} people. Which method would give a biased sample?`,
+    options: ({ k, s }) =>
+      k === 0
+        ? [`Names drawn at random from a list`, `The ${s} people sitting nearest you`, `${s} of your friends`, `Whoever volunteers first`]
+        : [`${s} people met at the fishing spot`, `${s} names drawn from a hat`, `Random numbers used on the full list`, `Every 10th name on the full name list`],
+    expected: ({ k, s }) => (k === 0 ? `Names drawn at random from a list` : `${s} people met at the fishing spot`),
+    solution: ({ k, s, total }) =>
+      k === 0
+        ? `A fair sample gives every one of the ${total} islanders an equal chance of being chosen. Drawing names at random from a list of everyone does this; the other methods favour certain people. So the best choice is: Names drawn at random from a list.`
+        : `People at the fishing spot are likely to enjoy fishing, so the ${s} answers would lean one way and not match all ${total} islanders. That is a biased sample: ${s} people met at the fishing spot. The other methods give everyone an equal chance.`,
+  },
+  {
+    id: "u06-every-nth-01",
+    unit: 6,
+    difficulty: 2,
+    resource: "wood",
+    format: INT,
+    params: (rng) => ({ n: int(rng, 3, 12), s: int(rng, 5, 12) }),
+    prompt: ({ n, s }, zone) =>
+      `${Z[zone].Place}, a numbered list holds ${n * s} islander names. You pick evenly spaced names, every nth name, to get a sample of ${s} names. What is n?`,
+    expected: ({ n }) => n,
+    solution: ({ n, s }) =>
+      `${s} names must be spread evenly over ${n * s} names, so you take one name from every ${n * s} ÷ ${s} = ${n} names. So n = ${n}.`,
   },
   {
     id: "u06-two-way-01",
@@ -325,6 +313,25 @@ export const UNIT_06: QuestionTemplate[] = [
       `The smallest value is in stem 1 with the smallest leaf: ${10 + a1}. The largest is in stem 3 with the biggest leaf: ${30 + c2}. ` +
       `Range = ${30 + c2} ${M} ${10 + a1} = ${30 + c2 - (10 + a1)}.`,
   },
+  {
+    id: "u06-pie-compare-01",
+    unit: 6,
+    difficulty: 2,
+    resource: "food",
+    format: INT,
+    params(rng) {
+      const n = pick(rng, PIE_N.filter((v) => v >= 20));
+      const fb = int(rng, 2, Math.floor(n / 5));
+      return { n, fb, fa: fb + int(rng, 2, Math.floor(n / 5)) };
+    },
+    prompt: ({ n, fa, fb }, zone) =>
+      `${Z[zone].Place}, a pie chart shows the favourite jobs of ${n} castaways. The fishing sector is ${(360 / n) * fa}° and the building sector is ${(360 / n) * fb}°. ` +
+      `How many more castaways chose fishing than building?`,
+    expected: ({ fa, fb }) => fa - fb,
+    solution: ({ n, fa, fb }) =>
+      `One castaway is 360 ÷ ${n} = ${360 / n}°. Fishing: ${(360 / n) * fa} ÷ ${360 / n} = ${fa}. Building: ${(360 / n) * fb} ÷ ${360 / n} = ${fb}. ` +
+      `The difference is ${fa} ${M} ${fb} = ${fa - fb}.`,
+  },
 
   // ---------------- Difficulty 3 ----------------
   {
@@ -333,12 +340,7 @@ export const UNIT_06: QuestionTemplate[] = [
     difficulty: 3,
     resource: "food",
     format: INT,
-    params(rng) {
-      const n = int(rng, 4, 6);
-      const m = int(rng, 10, 20);
-      const d = int(rng, 1, 4);
-      return { n, m, d };
-    },
+    params: (rng) => ({ n: int(rng, 4, 6), m: int(rng, 10, 20), d: int(rng, 1, 4) }),
     prompt: ({ n, m, d }, zone) =>
       `The mean number of ${Z[zone].food} you catch per day over ${n} days is ${m}. After one more day the mean rises to ${m + d}. ` +
       `How many did you catch on that last day?`,
@@ -402,43 +404,30 @@ export const UNIT_06: QuestionTemplate[] = [
     resource: "stone",
     format: CHOICE,
     params(rng) {
-      const k = int(rng, 0, 2);
       const lo = int(rng, 3, 8);
-      return { k, a: lo, b: lo + 1, c: lo + 1, d: lo + 2, e: lo + 3, big: int(rng, 40, 70), r: int(rng, 5, 9), s: int(rng, 3, 6), t: int(rng, 2, 6), days: int(rng, 20, 40) };
+      const calm = [lo, lo + 1, lo + 2, lo + 4, lo + 5];
+      const big = int(rng, 50, 80);
+      return {
+        k: int(rng, 0, 2),
+        ...pack("w", shuffled(rng, [...calm, big])),
+        ...pack("n", shuffled(rng, calm)),
+        r: int(rng, 5, 9), s: int(rng, 3, 6), t: int(rng, 2, 6), days: int(rng, 20, 40),
+      };
     },
-    prompt: ({ k, a, b, c, d, e, big, r, s, t, days }, zone) =>
+    prompt: (p, zone) =>
       [
-        `${Z[zone].Place}, the ${Z[zone].food} you catch in six days are ${a}, ${b}, ${c}, ${d}, ${e} and ${big}. Which average best describes a typical day?`,
-        `${Z[zone].Place}, a vote on sail colour gives red ${r + t}, blue ${r} and green ${s}. Which average tells you the most popular colour?`,
-        `${Z[zone].Place}, the ${Z[zone].food} caught on five days are ${a + 3}, ${b + 3}, ${c + 3}, ${d + 3} and ${e + 3}. You want to estimate the total for ${days} days. Which average helps most?`,
-      ][k],
+        `${Z[zone].Place}, the ${Z[zone].food} you catch in six days are ${list(unpack(p, "w", 6))}. Which average best describes a typical day?`,
+        `${Z[zone].Place}, a vote on sail colour gives red ${p.r + p.t}, blue ${p.r} and green ${p.s}. Which average tells you the most popular colour?`,
+        `${Z[zone].Place}, the ${Z[zone].food} caught on five days are ${list(unpack(p, "n", 5))}. You want to estimate the total for ${p.days} days. Which average helps most?`,
+      ][p.k],
     options: () => AVERAGES,
     expected: ({ k }) => AVERAGES[[1, 2, 0][k]],
     solution: ({ k }) =>
       [
-        "One day (the very large value) pulls the mean up, so the mean is not typical. The median is the middle value and ignores extremes. The answer is: The median.",
+        "One day (the very large value) pulls the mean up, so the mean is not typical, and no value repeats so there is no mode. The median is the middle value and ignores extremes. The answer is: The median.",
         "The most popular choice is the value that occurs most often, which is the mode. The answer is: The mode.",
         "There are no extreme values, and total = mean × number of days, so the mean is the right tool. The answer is: The mean.",
       ][k],
-  },
-  {
-    id: "u06-pie-compare-01",
-    unit: 6,
-    difficulty: 3,
-    resource: "food",
-    format: INT,
-    params(rng) {
-      const n = pick(rng, PIE_N.filter((v) => v >= 20));
-      const fb = int(rng, 2, Math.floor(n / 5));
-      return { n, fb, fa: fb + int(rng, 2, Math.floor(n / 5)) };
-    },
-    prompt: ({ n, fa, fb }, zone) =>
-      `A pie chart shows the favourite jobs of ${n} castaways. The fishing sector is ${(360 / n) * fa}° and the ${Z[zone].wood} sector is ${(360 / n) * fb}°. ` +
-      `How many more castaways chose fishing than ${Z[zone].wood}?`,
-    expected: ({ fa, fb }) => fa - fb,
-    solution: ({ n, fa, fb }) =>
-      `One castaway is 360 ÷ ${n} = ${360 / n}°. Fishing: ${(360 / n) * fa} ÷ ${360 / n} = ${fa}. Wood: ${(360 / n) * fb} ÷ ${360 / n} = ${fb}. ` +
-      `The difference is ${fa} ${M} ${fb} = ${fa - fb}.`,
   },
   {
     id: "u06-five-numbers-01",
@@ -465,28 +454,26 @@ export const UNIT_06: QuestionTemplate[] = [
       `The largest is the smallest plus the range: ${a} + ${r} = ${L}. The total is 5 × ${mean} = ${5 * mean}. ` +
       `The median is the middle (third) number, ${m}. So the fourth is ${5 * mean} ${M} ${a} ${M} ${s} ${M} ${m} ${M} ${L} = ${f}.`,
   },
+  {
+    id: "u06-sample-estimate-01",
+    unit: 6,
+    difficulty: 3,
+    resource: "wood",
+    format: INT,
+    params(rng) {
+      const s = pick(rng, [10, 12, 15, 20, 25]);
+      return { s, x: int(rng, Math.ceil(s * 0.2), Math.floor(s * 0.8)), m: int(rng, 3, 9) };
+    },
+    prompt: ({ s, x, m }, zone) =>
+      `${Z[zone].Place}, you ask a random sample of ${s} islanders, and ${x} say they prefer ${Z[zone].food}. ` +
+      `There are ${s * m} islanders in total. Estimate how many of them prefer ${Z[zone].food}.`,
+    expected: ({ x, m }) => x * m,
+    solution: ({ s, x, m }) =>
+      `The sample is ${s} out of ${s * m}, so the whole island is ${m} times bigger than the sample. If the sample is fair, about ${m} times as many prefer it: ${x} × ${m} = ${x * m}.`,
+  },
 ];
 
-// ---- local helpers used by templates above (function declarations are hoisted) ----
-
-/** A fixed shuffle seed derived from an integer, so prompt and solution agree. */
-function seedOrder(o: number): () => number {
-  let x = (o + 1) * 2654435761;
-  return () => {
-    x = (x * 1103515245 + 12345) % 2147483648;
-    return x / 2147483648;
-  };
-}
-function rowOf(p: Record<string, number>, i: number): number[] {
-  return [0, 1, 2, 3].map((j) => p[`g${i}${j}`]);
-}
-function medianOfTable(fs: number[]): number {
-  const n = sum(fs);
-  const target = (n + 1) / 2;
-  let run = 0;
-  for (let i = 0; i < fs.length; i++) {
-    run += fs[i];
-    if (run >= target) return i + 1;
-  }
-  return fs.length;
+function rangeOf(p: Record<string, number>, i: number): number {
+  const row = [0, 1, 2, 3].map((j) => p[`g${i}${j}`]);
+  return Math.max(...row) - Math.min(...row);
 }

@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_06 } from "@/content/units/unit-06";
-import { bankChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { rankChecks } from "./helpers/rank";
 
 bankChecks(6, UNIT_06);
+overlapChecks(UNIT_06);
+coordinateChecks(UNIT_06);
+rankChecks(UNIT_06);
 
 const get = (id: string) => UNIT_06.find((t) => t.id === id)!;
 const sum = (a: number[]) => a.reduce((s, v) => s + v, 0);
@@ -12,20 +16,20 @@ const median = (a: number[]) => {
   const n = s.length;
   return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
 };
+const modes = (v: number[]) => {
+  const counts = new Map<number, number>();
+  for (const x of v) counts.set(x, (counts.get(x) ?? 0) + 1);
+  const top = Math.max(...counts.values());
+  return { top, winners: [...counts].filter(([, c]) => c === top).map(([x]) => x) };
+};
 
 describe("unit 6 independent recompute", () => {
   const run = (id: string, check: (prompt: string, expected: number | string, options: string[] | undefined, where: string) => void) =>
     eachQuestion(get(id), ({ publicQ, expected }, where) => check(publicQ.prompt, expected, publicQ.options, where));
 
-  it("mean-01", () =>
-    run("u06-mean-01", (p, e) => {
-      const v = numsIn(p.slice(p.indexOf("land")));
-      expect(v).toHaveLength(5);
-      expect(sum(v) / 5).toBe(e);
-    }));
   it("median-odd-01", () =>
     run("u06-median-odd-01", (p, e) => {
-      const v = numsIn(p.replace("Seven", ""));
+      const v = numsIn(p.replace("seven", ""));
       expect(v).toHaveLength(7);
       expect(e).toBe(median(v));
     }));
@@ -33,11 +37,7 @@ describe("unit 6 independent recompute", () => {
     run("u06-mode-01", (p, e) => {
       const nums = numsIn(p.slice(p.indexOf("trips is")).replace("trips is", ""));
       expect(nums).toHaveLength(8);
-      const counts = new Map<number, number>();
-      for (const x of nums) counts.set(x, (counts.get(x) ?? 0) + 1);
-      const top = Math.max(...counts.values());
-      const winners = [...counts].filter(([, c]) => c === top).map(([x]) => x);
-      expect(winners).toEqual([e]);
+      expect(modes(nums).winners).toEqual([e]);
     }));
   it("range-01", () =>
     run("u06-range-01", (p, e) => {
@@ -55,24 +55,26 @@ describe("unit 6 independent recompute", () => {
       const want = /colour/.test(p) ? "Categorical" : /how many/.test(p) ? "Discrete" : "Continuous";
       expect(e).toBe(want);
     }));
+  it("data-source-01: only the measure-it-yourself option is primary", () =>
+    run("u06-data-source-01", (p, e, opts) => {
+      expect(opts!.filter((o) => /measure/.test(o))).toEqual([e]);
+      expect(opts!.filter((o) => /copy|read|old diary/.test(o))).toHaveLength(3);
+    }));
+  it("freq-mean-01", () =>
+    run("u06-freq-mean-01", (p, e) => {
+      const nums = numsIn(p.slice(p.indexOf("frequencies")));
+      const values = nums.slice(0, 4);
+      const freqs = nums.slice(4, 8);
+      expect(values[1]).toBe(values[0] + 1);
+      const total = sum(values.map((v, i) => v * freqs[i]));
+      expect(total / sum(freqs)).toBe(e);
+      expect(Number.isInteger(e)).toBe(true);
+    }));
   it("median-even-01", () =>
     run("u06-median-even-01", (p, e) => {
       const v = numsIn(p.replace("Six", ""));
       expect(v).toHaveLength(6);
       expect(e).toBe(median(v));
-    }));
-  it("freq-mean-01", () =>
-    run("u06-freq-mean-01", (p, e) => {
-      // The first numbers after "frequencies" are the values 1 to 4, then the four frequencies.
-      const [, , , , f1, f2, f3, f4] = numsIn(p.slice(p.indexOf("frequencies")));
-      const total = f1 + 2 * f2 + 3 * f3 + 4 * f4;
-      expect(total / (f1 + f2 + f3 + f4)).toBe(e);
-      expect(Number.isInteger(e)).toBe(true);
-    }));
-  it("missing-value-01", () =>
-    run("u06-missing-value-01", (p, e) => {
-      const [a, b, c, d, m] = numsIn(p.replace("first four days", "").replace("fifth day", "").replace("five days", ""));
-      expect(a + b + c + d + Number(e)).toBe(5 * m);
     }));
   it("compare-range-01: the named crew has the strictly smallest range", () =>
     run("u06-compare-range-01", (p, e, _o, where) => {
@@ -85,18 +87,22 @@ describe("unit 6 independent recompute", () => {
       expect(new Set(rows).size, where).toBe(3);
       expect(e).toBe(`Crew ${"ABC"[rows.indexOf(Math.min(...rows))]}`);
     }));
-  it("pie-reverse-01", () =>
-    run("u06-pie-reverse-01", (p, e) => {
-      const [n, angle] = numsIn(p);
-      expect((Number(e) * 360) / n).toBe(angle);
-    }));
-  it("sample-01: only the random-list method is correct", () =>
+  it("sample-01: fair means random from everyone, biased means asking only one kind of person", () =>
     run("u06-sample-01", (p, e, opts) => {
-      const [total, s] = numsIn(p);
-      expect(String(e)).toContain("at random");
-      expect(opts!.filter((o) => /random/.test(o))).toEqual([e]);
-      expect(String(e)).toContain(String(s));
-      expect(total).toBeGreaterThan(s);
+      expect(opts).toHaveLength(4);
+      if (/fairest/.test(p)) {
+        expect(String(e)).toContain("at random");
+        expect(opts!.filter((o) => /random/.test(o))).toEqual([e]);
+      } else {
+        expect(/biased/.test(p)).toBe(true);
+        expect(String(e)).toContain("fishing spot");
+        expect(opts!.filter((o) => /fishing spot/.test(o))).toEqual([e]);
+      }
+    }));
+  it("every-nth-01", () =>
+    run("u06-every-nth-01", (p, e) => {
+      const [names, sample] = numsIn(p);
+      expect(Number(e) * sample).toBe(names);
     }));
   it("two-way-01", () =>
     run("u06-two-way-01", (p, e) => {
@@ -112,6 +118,11 @@ describe("unit 6 independent recompute", () => {
       });
       const all = stems.flat();
       expect(Math.max(...all) - Math.min(...all)).toBe(e);
+    }));
+  it("pie-compare-01", () =>
+    run("u06-pie-compare-01", (p, e) => {
+      const [n, aFish, aBuild] = numsIn(p.slice(0, p.indexOf("How many")));
+      expect((aFish - aBuild) / (360 / n)).toBe(e);
     }));
   it("mean-add-01", () =>
     run("u06-mean-add-01", (p, e) => {
@@ -132,35 +143,42 @@ describe("unit 6 independent recompute", () => {
       expect(all.length % 2).toBe(1);
       expect(e).toBe(median(all));
     }));
-  it("best-average-01: outlier gives median, categories give mode, totals give mean", () =>
-    run("u06-best-average-01", (p, e) => {
+  it("best-average-01: exactly one average is defensible for the data given", () =>
+    run("u06-best-average-01", (p, e, _o, where) => {
       const want = /in six days are/.test(p) ? "The median" : /vote on sail colour/.test(p) ? "The mode" : "The mean";
       expect(e).toBe(want);
       if (want === "The median") {
         const v = numsIn(p.slice(p.indexOf("days are")).replace("days are", ""));
         expect(v).toHaveLength(6);
         expect(Math.max(...v)).toBeGreaterThan(4 * median(v));
+        // No repeated value, so there is no sensible mode either.
+        expect(modes(v).top, where).toBe(1);
       }
       if (want === "The mode") {
         const [red, blue, green] = numsIn(p);
         expect(red).toBeGreaterThan(Math.max(blue, green));
       }
-    }));
-  it("pie-compare-01", () =>
-    run("u06-pie-compare-01", (p, e) => {
-      const [n, aFish, aWood] = numsIn(p.slice(0, p.indexOf("How many")));
-      const perPerson = 360 / n;
-      expect((aFish - aWood) / perPerson).toBe(e);
+      if (want === "The mean") {
+        const v = numsIn(p.slice(p.indexOf("days are")).replace("days are", "")).slice(0, 5);
+        expect(v).toHaveLength(5);
+        expect(modes(v).top, where).toBe(1);
+        expect(Math.max(...v)).toBeLessThan(3 * median(v));
+      }
     }));
   it("five-numbers-01: the whole list satisfies mean, median, range and the givens", () =>
     run("u06-five-numbers-01", (p, e) => {
       const m = /mean (\d+), median (\d+) and range (\d+)\. The smallest is (\d+) and the second smallest is (\d+)/.exec(p)!;
       const [mean, med, range, a, s] = m.slice(1).map(Number);
-      const largest = a + range;
       const f = Number(e);
-      const list = [a, s, med, f, largest];
+      const list = [a, s, med, f, a + range];
       expect(sum(list)).toBe(5 * mean);
       expect(list).toEqual(sortedNums(list));
       expect(median(list)).toBe(med);
+    }));
+  it("sample-estimate-01", () =>
+    run("u06-sample-estimate-01", (p, e) => {
+      const [s, x, total] = numsIn(p);
+      expect((x * total) / s).toBe(e);
+      expect(x).toBeLessThan(s);
     }));
 });
