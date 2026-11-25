@@ -114,6 +114,9 @@ export const UNIT_13: QuestionTemplate[] = [
           pt(a, b + dy),
           pt(a - dx, b - dy),
           pt(a + dy, b + dx),
+          pt(a + c, b + d),
+          pt(a - c, b - d),
+          pt(dx, dy),
         ],
         s,
       );
@@ -161,7 +164,8 @@ export const UNIT_13: QuestionTemplate[] = [
     options: ({ a1, b1, a2, c2, axis, v, s }) => {
       const [x, y] = [[a1, a2], [b1, a2], [b1, c2]][v];
       const key = axis ? pt(x, -y) : pt(-x, y);
-      return mix(key, [axis ? pt(-x, y) : pt(x, -y), pt(-x, -y), pt(y, x), pt(-y, x), pt(x, y), pt(y, -x)], s);
+      const others = [[a1, a2], [b1, a2], [b1, c2]].filter((_, i) => i !== v).map(([ox, oy]) => (axis ? pt(ox, -oy) : pt(-ox, oy)));
+      return mix(key, [axis ? pt(-x, y) : pt(x, -y), pt(-x, -y), pt(y, x), pt(-y, x), pt(x, y), pt(y, -x), pt(-y, -x), ...others], s);
     },
     expected: ({ a1, b1, a2, c2, axis, v }) => {
       const [x, y] = [[a1, a2], [b1, a2], [b1, c2]][v];
@@ -308,12 +312,12 @@ export const UNIT_13: QuestionTemplate[] = [
       `${Z[zone].Place}, a trap is at P${pt(a, b)} on your grid map. P is reflected in the vertical line x = ${m}. ` +
       `What are the coordinates of the image of P?`,
     options: ({ m, a, b, s }) =>
-      mix(pt(2 * m - a, b), [pt(-a, b), pt(m - a, b), pt(a, 2 * m - b), pt(2 * m - a, -b), pt(a, -b), pt(m + a, b), pt(-a, -b), pt(2 * m + a, b)], s),
+      mix(pt(2 * m - a, b), [pt(-a, b), pt(m - a, b), pt(a, 2 * m - b), pt(2 * m - a, -b), pt(a, -b), pt(m + a, b), pt(-a, -b), pt(2 * m + a, b), pt(a - m, b), pt(m, b), pt(m - a, -b), pt(2 * (m - a), b), pt(2 * m - a, 2 * m - b), pt(m - a, m - b), pt(2 * m - a, m + b), pt(2 * m - a, b - m)], s),
     expected: ({ m, a, b }) => pt(2 * m - a, b),
     solution: ({ m, a, b }) => {
       const d = Math.abs(a - m);
       return (
-        `P is ${d} units ${a < m ? "left" : "right"} of the line x = ${m}, so its image is ${d} units on the other side: ` +
+        `P is ${d} ${d === 1 ? "unit" : "units"} ${a < m ? "left" : "right"} of the line x = ${m}, so its image is ${d} ${d === 1 ? "unit" : "units"} on the other side: ` +
         `x = ${m} ${a < m ? "+" : MINUS} ${d} = ${n(2 * m - a)}. The y-coordinate stays ${n(b)}, so the image is ${pt(2 * m - a, b)}.`
       );
     },
@@ -359,7 +363,7 @@ export const UNIT_13: QuestionTemplate[] = [
       const my = (y1 + y2) / 2;
       return mix(
         pt(mx, my),
-        [pt(x1 + x2, y1 + y2), pt((x2 - x1) / 2, (y2 - y1) / 2), pt(mx, y1 + y2), pt(my, mx), pt((Math.abs(x1) + Math.abs(x2)) / 2, (Math.abs(y1) + Math.abs(y2)) / 2), pt(x1 + x2, my), pt(mx, -my), pt(-mx, my), pt(x2 - x1, y2 - y1), pt(my, -mx)],
+        [pt(x1 + x2, y1 + y2), pt((x2 - x1) / 2, (y2 - y1) / 2), pt(mx, y1 + y2), pt(my, mx), pt((Math.abs(x1) + Math.abs(x2)) / 2, (Math.abs(y1) + Math.abs(y2)) / 2), pt(x1 + x2, my), pt(mx, -my), pt(-mx, my), pt(x2 - x1, y2 - y1), pt(my, -mx), pt((x1 - x2) / 2, (y1 - y2) / 2), pt(x1, y2), pt(x2, y1), pt(mx, y1), pt(x1, my)],
         s,
       );
     },

@@ -40,3 +40,33 @@ export function sharedCoordChecks(bank: QuestionTemplate[], minTemplates = 1) {
     });
   });
 }
+
+/**
+ * Near-miss guess check. For choice templates whose options are all points "(x, y)": the guess "pick the option
+ * with the most other options within 2 units in both coordinates" (the centre of the cluster) must pick the key on
+ * at most 40% of questions (ties split evenly).
+ */
+export function nearMissChecks(bank: QuestionTemplate[], ids: string[]) {
+  describe("near-miss neighbours do not find the key", () => {
+    for (const t of bank.filter((x) => ids.includes(x.id))) {
+      it(t.id, () => {
+        let n = 0, hit = 0;
+        eachQuestion(
+          t,
+          ({ publicQ, expected }) => {
+            const opts = publicQ.options!;
+            const v = opts.map((o) => numsIn(o));
+            const near = v.map((a, i) => v.filter((b, j) => i !== j && Math.abs(a[0] - b[0]) <= 2 && Math.abs(a[1] - b[1]) <= 2).length);
+            const key = opts.indexOf(expected as string);
+            const hi = Math.max(...near);
+            n++;
+            if (near[key] === hi) hit += 1 / near.filter((x) => x === hi).length;
+          },
+          SEEDS_200.slice(0, 80),
+        );
+        expect(n).toBeGreaterThan(0);
+        expect(hit / n, "cluster-centre guess finds the key too often").toBeLessThanOrEqual(0.4);
+      });
+    }
+  });
+}

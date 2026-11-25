@@ -3,7 +3,7 @@ import { UNIT_13 } from "@/content/units/unit-13";
 import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
 import { rankChecks, valueRankChecks } from "./helpers/rank";
 import { coordRankChecks } from "./helpers/rank2";
-import { sharedCoordChecks } from "./helpers/shared";
+import { sharedCoordChecks, nearMissChecks } from "./helpers/shared";
 
 bankChecks(13, UNIT_13);
 overlapChecks(UNIT_13);
@@ -15,6 +15,7 @@ coordRankChecks(
   UNIT_13.filter((t) => t.format.kind === "choice" && t.id !== "u13-quadrant-01" && t.id !== "u13-find-rotation-01").map((t) => t.id),
 );
 sharedCoordChecks(UNIT_13, 6);
+nearMissChecks(UNIT_13, ["u13-translate-point-01", "u13-reflect-vertex-01", "u13-rotate-90-01", "u13-reflect-line-01", "u13-enlarge-vertex-01", "u13-midpoint-neg-01", "u13-two-step-01", "u13-reverse-translation-01"]);
 
 const get = (id: string) => UNIT_13.find((t) => t.id === id)!;
 const MINUS = "−";

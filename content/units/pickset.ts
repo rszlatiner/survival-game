@@ -13,12 +13,13 @@ export function pickSet(key: string, pool: string[], targets: number[], tie: num
   const seen = new Set([key, ...forced]);
   const slips = pool.filter((o) => (seen.has(o) ? false : (seen.add(o), true)));
   const pairKey = /^\(−?\d+, −?\d+\)$/.test(key);
-  if (pairKey) {
+  if (pairKey && slips.length < 3) {
+    // only a thin pool is padded, and only as far as needed for three wrong options
     const [kx, ky] = nums(key);
     const f = (x: number, y: number) => `(${x < 0 ? "−" + -x : x}, ${y < 0 ? "−" + -y : y})`;
     for (const [dx, dy] of OFFSETS) {
       const o = f(kx + dx, ky + dy);
-      if (!seen.has(o)) (seen.add(o), slips.push(o));
+      if (!seen.has(o) && slips.length < 3) (seen.add(o), slips.push(o));
     }
   }
   const need = 3 - forced.length;
