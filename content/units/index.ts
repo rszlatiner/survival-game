@@ -11,6 +11,7 @@ import { UNIT_09 } from "@/content/units/unit-09";
 import { UNIT_10 } from "@/content/units/unit-10";
 import { UNIT_11 } from "@/content/units/unit-11";
 import { UNIT_12 } from "@/content/units/unit-12";
+import { UNIT_13 } from "@/content/units/unit-13";
 
 /** Question banks by unit number. Add each new unit's file here. */
 export const UNIT_BANKS: Record<number, QuestionTemplate[]> = {
@@ -26,6 +27,7 @@ export const UNIT_BANKS: Record<number, QuestionTemplate[]> = {
   10: UNIT_10,
   11: UNIT_11,
   12: UNIT_12,
+  13: UNIT_13,
 };
 
 export const ALL_TEMPLATES: QuestionTemplate[] = Object.values(UNIT_BANKS).flat();
