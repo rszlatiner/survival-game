@@ -3,11 +3,13 @@ import { UNIT_09 } from "@/content/units/unit-09";
 import { isCorrect } from "@/lib/answers";
 import { evalExpr, parseExpr } from "@/lib/mathexpr";
 import { generateQuestion } from "@/lib/questions/generate";
+import { coordRankChecks } from "./helpers/rank2";
 import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
 
 bankChecks(9, UNIT_09);
 overlapChecks(UNIT_09);
 coordinateChecks(UNIT_09);
+coordRankChecks(UNIT_09, ["u09-term-rule-01", "u09-member-03", "u09-constant-step-02"]);
 
 const get = (id: string) => UNIT_09.find((t) => t.id === id)!;
 
@@ -42,9 +44,9 @@ describe("unit 9 independent recompute", () => {
     run("u09-term-rule-01", (p, e, opts, where) => {
       const t = numsIn(p.split("What is")[0]).slice(0, 4);
       const fits = (o: string) => {
-        const m = /^(Add|Subtract|Multiply by) (\d+)$/.exec(o)!;
+        const m = /^(Add|Subtract|Multiply by|Divide by) (\d+)$/.exec(o)!;
         const k = Number(m[2]);
-        const f = m[1] === "Add" ? (x: number) => x + k : m[1] === "Subtract" ? (x: number) => x - k : (x: number) => x * k;
+        const f = m[1] === "Add" ? (x: number) => x + k : m[1] === "Subtract" ? (x: number) => x - k : m[1] === "Divide by" ? (x: number) => x / k : (x: number) => x * k;
         return [0, 1, 2].every((i) => f(t[i]) === t[i + 1]);
       };
       expect(opts!.filter(fits), where).toEqual([e]);

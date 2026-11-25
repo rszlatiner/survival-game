@@ -11,6 +11,7 @@
 import type { QuestionTemplate } from "@/lib/questions/types";
 import { int } from "@/lib/questions/random";
 import { ZONE_WORDS as Z } from "@/content/units/zones";
+import { pickRanked } from "@/content/units/rankpick";
 
 const INT = { kind: "integer" } as const;
 const CHOICE = { kind: "choice", options: [] as string[] } as const;
@@ -24,10 +25,6 @@ const co = (n: number) => (n === 1 ? "" : `${n}`);
 const andList = (xs: number[]) => `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 const firstFour = (a: number, d: number) => [a, a + d, a + 2 * d, a + 3 * d];
 
-/** The three-of-five choices used to keep different wrong options for different seeds. */
-const TRIPLES: number[][] = [];
-for (let i = 0; i < 5; i++) for (let j = i + 1; j < 5; j++) for (let k = j + 1; k < 5; k++) TRIPLES.push([i, j, k]);
-
 type RuleP = Record<string, number>;
 function ruleTerms({ kind, d, a, r }: RuleP): number[] {
   return kind === 0
@@ -39,20 +36,22 @@ function ruleTerms({ kind, d, a, r }: RuleP): number[] {
 function ruleKey({ kind, d, r }: RuleP): string {
   return kind === 0 ? `Add ${d}` : kind === 3 ? `Multiply by ${r}` : `Subtract ${d}`;
 }
+/** Slips: wrong gap or factor, the first term used as the step, a sign slip, off by one. */
 function rulePool({ kind, d, a, r }: RuleP): string[] {
-  if (kind === 0) return [`Add ${a}`, `Add ${d + 1}`, `Add ${d - 1}`, `Multiply by ${d}`, `Add ${a + d}`];
-  if (kind === 3) return [`Add ${a * r - a}`, `Multiply by ${r + 1}`, `Multiply by ${r - 1}`, `Add ${r}`, `Add ${a * r * r - a * r}`];
-  return [`Add ${d}`, `Subtract ${d + 1}`, `Subtract ${d - 1}`, `Subtract ${a}`, `Subtract ${a - d}`];
+  if (kind === 0)
+    return [`Add ${a}`, `Add ${d + 1}`, `Add ${d - 1}`, `Multiply by ${d}`, `Add ${a + d}`, `Add ${d + 2}`, `Add ${2 * d}`, `Add ${a - d}`, `Subtract ${d}`, `Multiply by ${d - 1}`, `Add ${d - 2}`, `Add ${d - 3}`];
+  if (kind === 3)
+    return [`Add ${a * r - a}`, `Multiply by ${r + 1}`, `Multiply by ${r - 1}`, `Add ${r}`, `Add ${a * r * r - a * r}`, `Multiply by ${r + 2}`, `Multiply by ${2 * r}`, `Add ${a}`, `Multiply by 2`, `Add ${r + 1}`, `Multiply by ${r - 2}`, `Multiply by 3`];
+  return [`Add ${d}`, `Subtract ${d + 1}`, `Subtract ${d - 1}`, `Subtract ${a}`, `Subtract ${a - d}`, `Subtract ${d + 2}`, `Subtract ${2 * d}`, `Divide by ${d}`, `Subtract ${a - 2 * d}`, `Add ${a - d}`, `Subtract ${d - 2}`, `Subtract ${d - 3}`];
 }
+const ruleNum = (o: string) => Number(/\d+/.exec(o)![0]);
 
-/** Six slips for "is this number in the sequence": none is a term, and none is a neighbour pair of the key. */
+/** Slips for "is this number in the sequence": none is a term, and the key's two neighbours never both appear. */
 function memberPool(d: number, c: number, k: number): number[] {
   const t = d * k + c;
-  return [t + 2, t - 3, t + d - 1, t + c, d * (k + 1), d * k];
+  return [t + 2, t - 3, t + d - 1, t + c, d * (k + 1), d * k, t - 2, t + 3, t - d + 1, t - 4, t + d + 1, t - c - 1];
 }
-/** The 20 ways to keep three of the six slips. */
-const SIX_TRIPLES: number[][] = [];
-for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) for (let k = j + 1; k < 6; k++) SIX_TRIPLES.push([i, j, k]);
+const isMemberTerm = (d: number, c: number) => (v: number) => v > c && (v - c) % d === 0;
 
 export const UNIT_09: QuestionTemplate[] = [
   // ---------------- Difficulty 1 ----------------
@@ -94,22 +93,16 @@ export const UNIT_09: QuestionTemplate[] = [
     format: CHOICE,
     params: (rng) => {
       // kind 0 add, 1 and 2 subtract (half the seeds fall), 3 multiply.
-      for (let i = 0; i < 100; i++) {
-        const kind = int(rng, 0, 3);
-        const d = int(rng, 3, 8);
-        const a = kind === 0 ? d + int(rng, 2, 10) : kind === 3 ? int(rng, 2, 5) : 3 * d + int(rng, 3, 12);
-        const r = int(rng, 3, 4);
-        const p = { kind, d, a, r, sel: int(rng, 0, 9) };
-        const all = [ruleKey(p), ...rulePool(p)];
-        if (new Set(all).size === all.length) return p;
-      }
-      return { kind: 0, d: 3, a: 8, r: 3, sel: 0 };
+      const kind = int(rng, 0, 3);
+      const d = int(rng, 5, 10);
+      const a = kind === 0 ? d + int(rng, 2, 10) : kind === 3 ? int(rng, 2, 5) : 3 * d + int(rng, 3, 12);
+      return { kind, d, a, r: int(rng, 4, 5), t: int(rng, 0, 3), tie: int(rng, 0, 999) };
     },
     prompt: (p, zone) =>
       `${Z[zone].Place}, the rows of your wall use ${andList(ruleTerms(p))} ${Z[zone].stone}, in that order. ` +
       `What is the term-to-term rule?`,
-    // Five slips (wrong gap, wrong first term, off by one, wrong sign); the seed keeps three of them.
-    options: (p) => [ruleKey(p), ...TRIPLES[p.sel].map((i) => rulePool(p)[i])],
+    // Slips (wrong gap, wrong first term, off by one, wrong sign); the seed picks three so the key's rank by number varies.
+    options: (p) => pickRanked(ruleKey(p), rulePool(p).filter((o) => ruleNum(o) >= 2), [ruleNum], [p.t], p.tie),
     expected: (p) => ruleKey(p),
     solution: (p) => {
       const t = ruleTerms(p);
@@ -280,23 +273,32 @@ export const UNIT_09: QuestionTemplate[] = [
     difficulty: 2,
     resource: "stone",
     format: CHOICE,
-    params: (rng) => ({ a: int(rng, 2, 4), d: int(rng, 5, 9), x: int(rng, 0, 4), y: int(rng, 1, 4) }),
+    params: (rng) => ({ a: int(rng, 2, 4), d: int(rng, 5, 9), t3: int(rng, 0, 3), t4: int(rng, 0, 3), tie: int(rng, 0, 999) }),
     prompt: ({ a, d }, zone) =>
       `${Z[zone].Place}, four plans for gathering ${Z[zone].stone} each give ${a} on day 1 and ${a + d} on day 2. ` +
       `Which plan goes up by the same amount every day?`,
-    // Five wrong plans, two left out by the seed (never the same pair for every seed).
-    options: ({ a, d, x, y }) => {
+    // Wrong plans have a gap that grows, shrinks, changes once or is a doubling or add-the-last-two pattern; the seed
+    // picks three so the key's third and fourth terms rank differently from seed to seed.
+    options: ({ a, d, t3, t4, tie }) => {
       const show = (t: number[]) => t.join(", ");
-      const wrong = [
-        show([a, a + d, a + 2 * d + 1, a + 3 * d + 3]),
-        show([a, a + d, a + 2 * d - 1, a + 3 * d - 3]),
-        show([a, a + d, a + 2 * d - 2, a + 3 * d - 6]),
-        show([a, a + d, 2 * a + 2 * d, 4 * a + 4 * d]),
-        show([a, a + d, 2 * a + d, 3 * a + 2 * d]),
-      ];
-      const first = x;
-      const second = (x + y) % 5;
-      return [show(firstFour(a, d)), ...wrong.filter((_, i) => i !== first && i !== second)];
+      const term = (n: number) => (o: string) => Number(o.split(", ")[n]);
+      return pickRanked(
+        show(firstFour(a, d)),
+        [
+          show([a, a + d, a + 2 * d + 1, a + 3 * d + 3]),
+          show([a, a + d, a + 2 * d - 1, a + 3 * d - 3]),
+          show([a, a + d, a + 2 * d - 2, a + 3 * d - 6]),
+          show([a, a + d, 2 * a + 2 * d, 4 * a + 4 * d]),
+          show([a, a + d, 2 * a + d, 3 * a + 2 * d]),
+          show([a, a + d, a + 2 * d, a + 3 * d + 1]),
+          show([a, a + d, a + 2 * d, a + 3 * d - 1]),
+          show([a, a + d, a + 2 * d + 2, a + 3 * d + 6]),
+          show([a, a + d, a + 2 * d - 1, a + 3 * d - 1]),
+        ],
+        [term(2), term(3)],
+        [t3, t4],
+        tie,
+      );
     },
     expected: ({ a, d }) => firstFour(a, d).join(", "),
     solution: ({ a, d }) =>
@@ -330,25 +332,16 @@ export const UNIT_09: QuestionTemplate[] = [
     resource: "wood",
     format: CHOICE,
     params: (rng) => {
-      for (let i = 0; i < 100; i++) {
-        const d = int(rng, 5, 10);
-        const c = int(rng, 2, d - 2);
-        const k = int(rng, 5, 15);
-        const t = d * k + c;
-        const vals = [t, ...memberPool(d, c, k)];
-        const isTerm = (v: number) => v > c && (v - c) % d === 0;
-        if (new Set(vals).size === vals.length && vals.slice(1).every((v) => !isTerm(v) && v > 0)) {
-          return { d, c, k, sel: int(rng, 0, 19) };
-        }
-      }
-      return { d: 7, c: 3, k: 9, sel: 0 };
+      const d = int(rng, 5, 10);
+      return { d, c: int(rng, 2, d - 2), k: int(rng, 5, 15), t: int(rng, 0, 3), tie: int(rng, 0, 999) };
     },
     prompt: ({ d, c }, zone) =>
       `${Z[zone].Place}, the number of ${Z[zone].wood} in row n of a path is ${d}n + ${c}. ` +
       `Which of these could be the number in one of the rows?`,
-    options: ({ d, c, k, sel }) => {
-      const pool = memberPool(d, c, k);
-      return [`${d * k + c}`, ...SIX_TRIPLES[sel].map((i) => `${pool[i]}`)];
+    options: ({ d, c, k, t, tie }) => {
+      const key = d * k + c;
+      const pool = memberPool(d, c, k).filter((v) => v > 0 && !isMemberTerm(d, c)(v) && Math.abs(v - key) !== 1);
+      return pickRanked(`${key}`, pool.map(String), [Number], [t], tie);
     },
     expected: ({ d, c, k }) => `${d * k + c}`,
     solution: ({ d, c, k }) =>
