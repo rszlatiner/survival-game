@@ -154,6 +154,27 @@ export function ProjectorView({ state, status }: { state: PublicGameState | null
               </span>
             )}
             {live && <span className="font-bold">{answered} of {asked} teams have answered</span>}
+            {/* The fund lives up here so it is visible without scrolling, however many teams there are. */}
+            <div data-testid="hazard-fund" className="ml-auto flex min-w-[420px] flex-1 basis-[420px] items-center gap-3">
+              <StormIcon size={48} className={round.hazard ? "shrink-0 animate-bob" : "shrink-0"} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-3 text-2xl font-black">
+                  <span>Island fund</span>
+                  <span className="font-bold">{fundTotal} of {threshold} needed</span>
+                </div>
+                <div
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={threshold}
+                  aria-valuenow={Math.min(fundTotal, threshold)}
+                  aria-label="Island fund progress"
+                  className="seg-bar mt-1 h-8 w-full"
+                  style={{ ["--seg" as string]: `${100 / Math.max(1, threshold)}%` }}
+                >
+                  <div className="seg-fill bg-sunset-400" style={{ width: `${fundPct}%` }} />
+                </div>
+              </div>
+            </div>
           </section>
         )}
 
@@ -247,24 +268,6 @@ export function ProjectorView({ state, status }: { state: PublicGameState | null
                   );
                 })}
               </ul>
-            </section>
-            <section aria-label="Hazard fund" className={`${nightPanel} text-3xl`}>
-              <h2 className="mb-2 flex items-center gap-3 font-black">
-                <StormIcon size={56} className={round?.hazard && phase !== "finished" ? "animate-bob" : ""} />
-                Island fund
-              </h2>
-              <div
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={threshold}
-                aria-valuenow={Math.min(fundTotal, threshold)}
-                aria-label="Island fund progress"
-                className="seg-bar h-12 w-full"
-                style={{ ["--seg" as string]: `${100 / Math.max(1, threshold)}%` }}
-              >
-                <div className="seg-fill bg-sunset-400" style={{ width: `${fundPct}%` }} />
-              </div>
-              <p className="mt-2 font-bold">{fundTotal} of {threshold} needed</p>
             </section>
           </div>
         </div>

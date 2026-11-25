@@ -437,3 +437,36 @@ describe("join screen", () => {
     expect(h.joinGame).toHaveBeenCalledWith("ABCDEF", { teamName: "Owls" });
   });
 });
+
+describe("declared tie (fix wave I1)", () => {
+  it("hides Build, Market and Fund in reveal while a tie is pending, with a short message", async () => {
+    asDevice(0);
+    setGame({ ...reveal(true), tiedIds: ["t1", "t2"] });
+    render(<TeamPlay code="ABCDEF" />);
+    expect(await screen.findByText("Tie! A tiebreak question decides the winner.")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Build" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Market" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Island fund" })).toBeNull();
+    expect(screen.getByText(/12 x 3 = 36/)).toBeTruthy(); // the worked solution still shows
+  });
+
+  it("shows the spend panels in reveal when there is no tie", async () => {
+    asDevice(0);
+    setGame(reveal(true));
+    render(<TeamPlay code="ABCDEF" />);
+    expect(await screen.findByRole("region", { name: "Build" })).toBeTruthy();
+    expect(screen.queryByText(/tiebreak question decides/i)).toBeNull();
+  });
+});
+
+describe("one team per device (fix wave I2)", () => {
+  it("joining a second team shows a friendly ALREADY_ON_TEAM message", async () => {
+    h.fetchState.mockResolvedValue(state({ phase: "lobby", round: null }));
+    h.joinGame.mockRejectedValue(new h.ClientApiError(409, "ALREADY_ON_TEAM"));
+    const user = userEvent.setup();
+    render(<JoinScreen initialCode="ABCDEF" onJoined={() => {}} />);
+    await user.click(await screen.findByRole("button", { name: /find game/i }));
+    await user.click(await screen.findByRole("button", { name: /join gulls/i }));
+    expect(await screen.findByText(/already on another team/i)).toBeTruthy();
+  });
+});

@@ -11,10 +11,14 @@ export const SAFETY_FETCH_MS = 5000;
 export const SILENCE_MS = 5000;
 export const POLL_MS = 2000;
 export const OFFLINE_AFTER_FAILURES = 3;
+/** Minimum time between the starts of two ping-triggered fetches; a ping inside the gap is queued. */
+export const PING_GAP_MS = 300;
 
 /**
  * Public game state for `code`. Realtime pings are only a trigger to re-fetch;
- * all fetches (ping, safety, polling) share one single-flight guard.
+ * all fetches (ping, safety, polling) share one single-flight guard, and
+ * ping-triggered fetches also start at least PING_GAP_MS apart (extra pings
+ * inside the gap collapse into one fetch at the end of it).
  */
 export function useGameState(
   code: string,
@@ -40,6 +44,8 @@ export function useGameState(
     let tickMs = 0;
     let silence: ReturnType<typeof setTimeout> | null = null;
     let reported: GameStatus | null = null;
+    let lastPingLoad = -Infinity;
+    let pingTimer: ReturnType<typeof setTimeout> | null = null;
 
     setState(null);
 
@@ -102,6 +108,22 @@ export function useGameState(
       }
     };
 
+    /** A ping-triggered fetch: now if the gap has passed, else once it has (one queued at most). */
+    const pingLoad = () => {
+      if (pingTimer) return;
+      const wait = lastPingLoad + PING_GAP_MS - Date.now();
+      if (wait <= 0) {
+        lastPingLoad = Date.now();
+        void load();
+        return;
+      }
+      pingTimer = setTimeout(() => {
+        pingTimer = null;
+        lastPingLoad = Date.now();
+        void load();
+      }, wait);
+    };
+
     const armSilence = () => {
       if (silence) clearTimeout(silence);
       silence = setTimeout(() => {
@@ -123,7 +145,7 @@ export function useGameState(
         onPing: () => {
           if (disposed) return;
           heard();
-          void load();
+          pingLoad();
         },
         onStatus: (s) => {
           if (disposed) return;
@@ -167,6 +189,7 @@ export function useGameState(
       applyRef.current = () => {};
       if (tick) clearInterval(tick);
       if (silence) clearTimeout(silence);
+      if (pingTimer) clearTimeout(pingTimer);
       inFlight?.abort();
       try {
         handle?.close();

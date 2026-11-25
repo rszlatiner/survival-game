@@ -2,7 +2,7 @@
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useGameState, type GameStatus } from "@/lib/client/useGameState";
+import { PING_GAP_MS, useGameState, type GameStatus } from "@/lib/client/useGameState";
 import type { ChannelFactory, ChannelStatus } from "@/lib/client/realtime";
 import type { PublicGameState } from "@/lib/engine/public";
 import { ClientApiError, fetchState, createGame, hostLogin, joinGame, postHost, postTeam } from "@/lib/client/api";
@@ -188,9 +188,43 @@ describe("useGameState", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     release();
     await tick(0);
+    // The rest of the burst is one follow-up fetch, started after the 300 ms ping gap.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await tick(PING_GAP_MS);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    await tick(PING_GAP_MS * 3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps at least 300 ms between ping-triggered fetch starts (fix wave M2)", async () => {
+    const ch = new FakeChannel();
+    mount("ABCDEF", ch.factory);
     await tick(0);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fetchMock.mockClear();
+    await act(async () => ch.onPing());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await tick(100);
+    await act(async () => ch.onPing());
+    expect(fetchMock).toHaveBeenCalledTimes(1); // too soon: queued
+    await tick(150);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // 250 ms after the first start
+    await tick(60);
+    expect(fetchMock).toHaveBeenCalledTimes(2); // 310 ms: the queued one has started
+    await tick(400);
+    await act(async () => ch.onPing());
+    expect(fetchMock).toHaveBeenCalledTimes(3); // well past the gap: immediate
+  });
+
+  it("the ping gap does not delay other fetches (fix wave M2)", async () => {
+    const ch = new FakeChannel();
+    mount("ABCDEF", ch.factory);
+    await tick(0);
+    fetchMock.mockClear();
+    await act(async () => ch.onPing());
+    await tick(50);
+    act(() => latest.applyState(st(9)));
+    await tick(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2); // the action's refresh is not held back by the ping gap
   });
 
   it("goes offline after consecutive fetch failures and recovers", async () => {

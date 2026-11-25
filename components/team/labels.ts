@@ -39,6 +39,7 @@ const ERRORS: Record<string, string> = {
   LOCKED: "The game has started, so new teams cannot join. Pick an existing team.",
   TOO_MANY_TEAMS: "The island is full.",
   TOO_MANY_DEVICES: "That team already has the most devices allowed.",
+  ALREADY_ON_TEAM: "This device is already on another team. Ask your teacher to reset that team's devices if you need to switch.",
   NOT_FOUND: "Not found. Check the game code.",
   UNAUTHORIZED: "Your session expired. Please join again.",
   CONFLICT: "The game changed at the same moment. Try again.",

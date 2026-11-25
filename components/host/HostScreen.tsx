@@ -128,16 +128,21 @@ export function HostScreen({ state, status, send, login }: Props) {
             {phase === "lobby" && (
               <button type="button" disabled={busy || state.teams.length === 0} onClick={() => void act({ type: "start" })} className={tone("palm")}>
                 <StarIcon size={24} />
-                Start game
+                {busy ? "Starting..." : "Start game"}
               </button>
             )}
             {phase === "lobby" && state.teams.length === 0 && (
               <p data-testid="start-hint" className="self-center text-sm font-bold text-sunset-300">Start unlocks when at least one team has joined.</p>
             )}
-            <button type="button" disabled={!canNext} onClick={() => void act({ type: "next" })} className={tone("ocean")}>
-              <RaftIcon size={26} />
-              {nextLabel}
-            </button>
+            {phase === "lobby" && state.teams.length > 0 && (
+              <p data-testid="start-hint" className="self-center text-sm font-bold text-sunset-300">Locks the teams and starts round 1 straight away.</p>
+            )}
+            {phase !== "lobby" && (
+              <button type="button" disabled={!canNext} onClick={() => void act({ type: "next" })} className={tone("ocean")}>
+                <RaftIcon size={26} />
+                {nextLabel}
+              </button>
+            )}
             <button type="button" disabled={!canReveal} onClick={() => void act({ type: "reveal" })} className={tone("sunset")}>
               <Sun size={26} />
               {revealLabel}
@@ -266,6 +271,7 @@ function TeamRow({ team, lobby, finished, act }: { team: PublicTeam; lobby: bool
   const [name, setName] = useState(team.name);
   const [cap, setCap] = useState(String(team.captainIndex));
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   return (
     <li className={`${card} space-y-2 border-l-8`} style={{ borderLeftColor: ZONE_COLOR[team.zone].hex }}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -288,6 +294,25 @@ function TeamRow({ team, lobby, finished, act }: { team: PublicTeam; lobby: bool
           ) : (
             <button type="button" onClick={() => setConfirmRemove(true)} className={tone("coral")}>
               Remove {team.name}
+            </button>
+          )}
+        </div>
+      )}
+      {!finished && team.deviceCount > 1 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {confirmReset ? (
+            <div role="group" aria-label={`Confirm reset devices for ${team.name}`} className="flex flex-wrap items-center gap-2">
+              <p className="basis-full text-sm font-bold">
+                This keeps the first device that joined {team.name} (it becomes captain) and signs out the other {team.deviceCount - 1}. Stock and points stay. Signed-out devices can join again or join another team.
+              </p>
+              <button type="button" onClick={() => void act({ type: "resetDevices", teamId: team.id }).then(() => setConfirmReset(false))} className={tone("danger")}>
+                Yes, reset devices for {team.name}
+              </button>
+              <button type="button" onClick={() => setConfirmReset(false)} className={tone("sand")}>Cancel</button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setConfirmReset(true)} className={tone("coral")}>
+              Reset devices for {team.name}
             </button>
           )}
         </div>

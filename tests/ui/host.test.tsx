@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import * as React from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublicGameState, PublicTeam } from "@/lib/engine/public";
@@ -382,6 +382,28 @@ describe("host screen", () => {
     expect(((await screen.findByRole("button", { name: /start tiebreak/i })) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("lobby Start posts start and the screen shows round 1's question at once", async () => {
+    asHost();
+    // Realistic wiring: HostPlay applies the state the server returns through applyState.
+    h.useGameState.mockImplementation(() => {
+      const [s, set] = React.useState<PublicGameState>(state({ phase: "lobby", round: null }));
+      return { state: s, status: "live", applyState: set };
+    });
+    // The server's answer to "start" is the question phase of round 1 (start opens the round).
+    h.postHost.mockImplementation(async (_code: string, a: { type: string }) =>
+      a.type === "start" ? state({ version: 3, phase: "question" }) : {},
+    );
+    const user = userEvent.setup();
+    render(<HostPlay code="ABCDEF" />);
+    expect(screen.getByText(/starts round 1 straight away/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /next round/i })).toBeNull(); // no dead Next button in the lobby
+    await user.click(await screen.findByRole("button", { name: /start game/i }));
+    expect(h.postHost).toHaveBeenLastCalledWith("ABCDEF", { type: "start" });
+    expect((await screen.findByTestId("phase")).textContent).toMatch(/question, round 1 of 6/i);
+    expect(screen.getByText("Catch 12 fish 3 days?")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /start game/i })).toBeNull();
+  });
+
   it("lobby lists teams with rename, remove (confirmed) and start", async () => {
     asHost();
     setGame(state({ phase: "lobby", round: null }));
@@ -398,6 +420,30 @@ describe("host screen", () => {
     expect(h.postHost).toHaveBeenCalledTimes(2);
     await user.click(screen.getByRole("button", { name: /yes, remove gulls/i }));
     expect(h.postHost).toHaveBeenLastCalledWith("ABCDEF", { type: "remove", teamId: "t2" });
+  });
+
+  it("Reset devices asks first, then posts resetDevices (lobby and in game)", async () => {
+    for (const phase of ["lobby", "question"] as const) {
+      asHost();
+      setGame(state(phase === "lobby" ? { phase, round: null } : { phase }));
+      const user = userEvent.setup();
+      const { unmount } = render(<HostPlay code="ABCDEF" />);
+      h.postHost.mockClear();
+      await user.click(await screen.findByRole("button", { name: "Reset devices for Crabs" }));
+      expect(h.postHost).not.toHaveBeenCalled();
+      expect(screen.getByText(/keeps the first device/i)).toBeTruthy();
+      await user.click(screen.getByRole("button", { name: /yes, reset devices for crabs/i }));
+      expect(h.postHost).toHaveBeenLastCalledWith("ABCDEF", { type: "resetDevices", teamId: "t1" });
+      unmount();
+    }
+  });
+
+  it("Reset devices is not offered for a team with a single device", async () => {
+    asHost();
+    setGame(state({ teams: [team({ deviceCount: 1 })] }));
+    render(<HostPlay code="ABCDEF" />);
+    await screen.findByLabelText("Captain device for Crabs");
+    expect(screen.queryByRole("button", { name: /reset devices/i })).toBeNull();
   });
 
   it("reassigns a captain", async () => {
@@ -520,6 +566,17 @@ describe("projector view", () => {
     for (const z of ["beach", "forest", "cave", "hills", "lagoon"]) expect(screen.getByTestId(`zone-${z}`)).toBeTruthy();
     expect(screen.getByRole("progressbar")).toBeTruthy();
     expect(screen.getByTestId("timer").textContent).toMatch(/\d+s/);
+  });
+
+  it("puts the island fund bar in the top event bar, above the map (fix wave M1)", () => {
+    setGame(state({ fund: { water: 2, food: 1, wood: 0, stone: 0 } }));
+    render(<ProjectorPlay code="ABCDEF" />);
+    const bar = screen.getByRole("region", { name: "Island event" });
+    const fund = within(bar).getByRole("progressbar", { name: "Island fund progress" });
+    expect(fund.getAttribute("aria-valuenow")).toBe("3");
+    expect(within(bar).getByText(/3 of \d+/)).toBeTruthy();
+    const map = screen.getByRole("region", { name: "Island map" });
+    expect(bar.compareDocumentPosition(map) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows the reconnecting banner only when offline", () => {

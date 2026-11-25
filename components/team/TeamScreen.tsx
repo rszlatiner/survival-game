@@ -202,9 +202,16 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
     <>
       {header}
       <RevealView result={round?.results?.[teamId]} />
-      <BuildPanel team={team} busy={busy} act={act} />
-      <MarketPanel team={team} bonus={round?.bonusResource ?? null} busy={busy} act={act} />
-      <FundPanel team={team} fund={state.fund} hazard={round?.hazard === true} busy={busy} act={act} />
+      {state.tiedIds.length > 0 ? (
+        // The server refuses spending once a tie is declared, so the panels are hidden.
+        <p data-testid="tie-pending" className={`${panel} text-center text-lg font-black`}>Tie! A tiebreak question decides the winner.</p>
+      ) : (
+        <>
+          <BuildPanel team={team} busy={busy} act={act} />
+          <MarketPanel team={team} bonus={round?.bonusResource ?? null} busy={busy} act={act} />
+          <FundPanel team={team} fund={state.fund} hazard={round?.hazard === true} busy={busy} act={act} />
+        </>
+      )}
       <Scoreboard teams={state.teams} myId={teamId} winnerId={null} />
     </>,
   );
