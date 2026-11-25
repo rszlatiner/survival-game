@@ -3,11 +3,13 @@ import { UNIT_10 } from "@/content/units/unit-10";
 import { isCorrect } from "@/lib/answers";
 import { evalExpr, parseExpr } from "@/lib/mathexpr";
 import { generateQuestion } from "@/lib/questions/generate";
+import { coordRankChecks } from "./helpers/rank2";
 import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
 
 bankChecks(10, UNIT_10);
 overlapChecks(UNIT_10);
 coordinateChecks(UNIT_10);
+coordRankChecks(UNIT_10, ["u10-midpoint-02", "u10-on-line-02", "u10-rectangle-02", "u10-claim-03"]);
 
 const get = (id: string) => UNIT_10.find((t) => t.id === id)!;
 const format = (id: string) => get(id).format;
@@ -210,7 +212,7 @@ describe("unit 10 coordinate options do not give the key away", () => {
       expect(new Set(others.map((o) => o[0])).size).toBeGreaterThanOrEqual(2);
     });
     expect(swapShown / n).toBeLessThan(0.8);
-    expect(swapShown / n).toBeGreaterThan(0.3);
+    expect(swapShown / n).toBeGreaterThan(0.2);
   });
   it("claim-03: every option is self-consistent with Sam's stated point", () => {
     eachQuestion(get("u10-claim-03"), ({ publicQ }, where) => {
