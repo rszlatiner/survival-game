@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_06 } from "@/content/units/unit-06";
 import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
-import { rankChecks } from "./helpers/rank";
+import { rankChecks, valueRankChecks } from "./helpers/rank";
 
 bankChecks(6, UNIT_06);
 overlapChecks(UNIT_06);
 coordinateChecks(UNIT_06);
 rankChecks(UNIT_06);
+valueRankChecks(UNIT_06);
 
 const get = (id: string) => UNIT_06.find((t) => t.id === id)!;
 const sum = (a: number[]) => a.reduce((s, v) => s + v, 0);
@@ -55,17 +56,17 @@ describe("unit 6 independent recompute", () => {
       const want = /colour/.test(p) ? "Categorical" : /how many/.test(p) ? "Discrete" : "Continuous";
       expect(e).toBe(want);
     }));
-  it("data-source-01: only the measure-it-yourself option is primary", () =>
+  it("data-source-01: only the do-it-yourself option is primary", () =>
     run("u06-data-source-01", (p, e, opts) => {
-      expect(opts!.filter((o) => /measure/.test(o))).toEqual([e]);
-      expect(opts!.filter((o) => /copy|read|old diary/.test(o))).toHaveLength(3);
+      expect(opts!.filter((o) => /^You (measure|time|count|ask) /.test(o))).toEqual([e]);
+      expect(opts!.filter((o) => /^You (copy|read|use|look up) /.test(o))).toHaveLength(3);
     }));
   it("freq-mean-01", () =>
     run("u06-freq-mean-01", (p, e) => {
       const nums = numsIn(p.slice(p.indexOf("frequencies")));
       const values = nums.slice(0, 4);
       const freqs = nums.slice(4, 8);
-      expect(values[1]).toBe(values[0] + 1);
+      expect(values[1] - values[0]).toBe(values[2] - values[1]);
       const total = sum(values.map((v, i) => v * freqs[i]));
       expect(total / sum(freqs)).toBe(e);
       expect(Number.isInteger(e)).toBe(true);
@@ -97,6 +98,8 @@ describe("unit 6 independent recompute", () => {
         expect(/biased/.test(p)).toBe(true);
         expect(String(e)).toContain("fishing spot");
         expect(opts!.filter((o) => /fishing spot/.test(o))).toEqual([e]);
+        const [total, size] = numsIn(p);
+        expect(total).toBe(10 * size);
       }
     }));
   it("every-nth-01", () =>

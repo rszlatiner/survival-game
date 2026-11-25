@@ -30,6 +30,18 @@ function shuffled<T>(rng: () => number, a: T[]): T[] {
 /** Group sizes whose sector angle per person (360 / n) is a whole number. */
 const PIE_N = [12, 15, 18, 20, 24, 30, 36, 40, 45, 60];
 
+const PRIMARY = (n: number) => [
+  `You measure ${n} shells with a ruler`,
+  `You time ${n} crabs with a stopwatch`,
+  `You count ${n} nests on your own walk`,
+  `You ask ${n} islanders your questions`,
+];
+const SECONDARY = (n: number) => [
+  `You copy ${n} tide times from a chart`,
+  `You read ${n} counts in a report`,
+  `You use ${n} notes from a sailor's diary`,
+  `You look up ${n} records in the archive`,
+];
 const TYPES = ["Categorical", "Discrete", "Continuous"];
 const AVERAGES = ["The mean", "The median", "The mode", "The range"];
 
@@ -146,19 +158,14 @@ export const UNIT_06: QuestionTemplate[] = [
     difficulty: 1,
     resource: "food",
     format: CHOICE,
-    params: (rng) => ({ n: int(rng, 12, 48) }),
+    params: (rng) => ({ n: int(rng, 12, 48), k: int(rng, 0, 3), ...Object.fromEntries(shuffled(rng, [0, 1, 2, 3]).map((v, i) => [`q${i}`, v])) }),
     prompt: ({ n }, zone) =>
       `${Z[zone].Place}, you plan to study ${n} items. Which way of getting the data gives primary data, collected by you?`,
-    options: ({ n }) => [
-      `You measure ${n} shells with a ruler`,
-      `You copy ${n} tide times from a chart`,
-      `You read ${n} counts in a report`,
-      `You use ${n} figures from the old diary`,
-    ],
-    expected: ({ n }) => `You measure ${n} shells with a ruler`,
-    solution: ({ n }) =>
-      `Primary data is data you collect yourself. Measuring ${n} shells with a ruler is collecting it yourself: You measure ${n} shells with a ruler. ` +
-      `Charts, reports and diaries already exist, so they give secondary data.`,
+    options: (p) => [PRIMARY(p.n)[p.k], ...[0, 1, 2].map((i) => SECONDARY(p.n)[p[`q${i}`]])],
+    expected: (p) => PRIMARY(p.n)[p.k],
+    solution: (p) =>
+      `Primary data is data you collect yourself. "${PRIMARY(p.n)[p.k]}" is collecting it yourself, so it is primary. ` +
+      `The other options use records that already exist, which is secondary data.`,
   },
 
   // ---------------- Difficulty 2 ----------------
@@ -169,22 +176,25 @@ export const UNIT_06: QuestionTemplate[] = [
     resource: "food",
     format: INT,
     params(rng) {
-      const v = int(rng, 1, 6);
-      for (let i = 0; i < 300; i++) {
-        const f = [0, 1, 2, 3].map(() => int(rng, 1, 8));
-        const extra = f[1] + 2 * f[2] + 3 * f[3];
-        if (extra % sum(f) === 0) return { v, f1: f[0], f2: f[1], f3: f[2], f4: f[3] };
+      const v = int(rng, 0, 6);
+      const step = int(rng, 1, 3);
+      for (let i = 0; i < 400; i++) {
+        const f = [0, 1, 2, 3].map(() => int(rng, 0, 8));
+        const n = sum(f);
+        if (n < 6) continue;
+        const extra = step * (f[1] + 2 * f[2] + 3 * f[3]);
+        if (extra % n === 0) return { v, step, f1: f[0], f2: f[1], f3: f[2], f4: f[3] };
       }
-      return { v, f1: 2, f2: 3, f3: 3, f4: 2 };
+      return { v: 1, step: 1, f1: 2, f2: 3, f3: 3, f4: 2 };
     },
-    prompt: ({ v, f1, f2, f3, f4 }, zone) =>
-      `You checked baskets of ${Z[zone].food}. The frequencies for ${v}, ${v + 1}, ${v + 2} and ${v + 3} items per basket are ${f1}, ${f2}, ${f3} and ${f4} baskets. ` +
+    prompt: ({ v, step, f1, f2, f3, f4 }, zone) =>
+      `You checked baskets of ${Z[zone].food}. The frequencies for ${v}, ${v + step}, ${v + 2 * step} and ${v + 3 * step} items per basket are ${f1}, ${f2}, ${f3} and ${f4} baskets. ` +
       `What is the mean number of items per basket?`,
-    expected: ({ v, f1, f2, f3, f4 }) => (v * f1 + (v + 1) * f2 + (v + 2) * f3 + (v + 3) * f4) / (f1 + f2 + f3 + f4),
-    solution: ({ v, f1, f2, f3, f4 }) => {
-      const total = v * f1 + (v + 1) * f2 + (v + 2) * f3 + (v + 3) * f4;
+    expected: ({ v, step, f1, f2, f3, f4 }) => (v * f1 + (v + step) * f2 + (v + 2 * step) * f3 + (v + 3 * step) * f4) / (f1 + f2 + f3 + f4),
+    solution: ({ v, step, f1, f2, f3, f4 }) => {
+      const total = v * f1 + (v + step) * f2 + (v + 2 * step) * f3 + (v + 3 * step) * f4;
       const n = f1 + f2 + f3 + f4;
-      return `Total items = ${v}×${f1} + ${v + 1}×${f2} + ${v + 2}×${f3} + ${v + 3}×${f4} = ${total}. Number of baskets = ${f1} + ${f2} + ${f3} + ${f4} = ${n}. Mean = ${total} ÷ ${n} = ${total / n}.`;
+      return `Total items = ${v}×${f1} + ${v + step}×${f2} + ${v + 2 * step}×${f3} + ${v + 3 * step}×${f4} = ${total}. Number of baskets = ${f1} + ${f2} + ${f3} + ${f4} = ${n}. Mean = ${total} ÷ ${n} = ${total / n}.`;
     },
   },
   {
@@ -215,7 +225,7 @@ export const UNIT_06: QuestionTemplate[] = [
   {
     id: "u06-compare-range-01",
     unit: 6,
-    difficulty: 2,
+    difficulty: 3,
     resource: "stone",
     format: CHOICE,
     params(rng) {
@@ -229,7 +239,7 @@ export const UNIT_06: QuestionTemplate[] = [
     },
     prompt: (p, zone) => {
       const grp = (i: number) => list([0, 1, 2, 3].map((j) => p[`g${i}${j}`]));
-      return `Three crews log ${Z[zone].food} caught on 4 days. Crew A: ${grp(0)}. Crew B: ${grp(1)}. Crew C: ${grp(2)}. Which crew's catches are the most consistent (smallest range)?`;
+      return `Three crews log ${Z[zone].food} collected on 4 days. Crew A: ${grp(0)}. Crew B: ${grp(1)}. Crew C: ${grp(2)}. Which crew's catches are the most consistent (smallest range)?`;
     },
     options: () => ["Crew A", "Crew B", "Crew C"],
     expected: (p) => {
@@ -247,7 +257,11 @@ export const UNIT_06: QuestionTemplate[] = [
     difficulty: 2,
     resource: "food",
     format: CHOICE,
-    params: (rng) => ({ k: int(rng, 0, 1), total: int(rng, 60, 200), s: int(rng, 8, 20) }),
+    params(rng) {
+      const k = int(rng, 0, 1);
+      const s = int(rng, 8, 20);
+      return { k, s, total: k === 0 ? int(rng, 60, 200) : 10 * s };
+    },
     prompt: ({ k, total, s }, zone) =>
       k === 0
         ? `${Z[zone].Place}, you want to know which food all ${total} islanders like best, but you can only ask ${s} people. Which method gives the fairest sample?`
@@ -255,12 +269,12 @@ export const UNIT_06: QuestionTemplate[] = [
     options: ({ k, s }) =>
       k === 0
         ? [`Names drawn at random from a list`, `The ${s} people sitting nearest you`, `${s} of your friends`, `Whoever volunteers first`]
-        : [`${s} people met at the fishing spot`, `${s} names drawn from a hat`, `Random numbers used on the full list`, `Every 10th name on the full name list`],
+        : [`${s} people met at the fishing spot`, `${s} names from a hat of all names`, `Random numbers used on the full list`, `Every 10th name on the full list`],
     expected: ({ k, s }) => (k === 0 ? `Names drawn at random from a list` : `${s} people met at the fishing spot`),
     solution: ({ k, s, total }) =>
       k === 0
         ? `A fair sample gives every one of the ${total} islanders an equal chance of being chosen. Drawing names at random from a list of everyone does this; the other methods favour certain people. So the best choice is: Names drawn at random from a list.`
-        : `People at the fishing spot are likely to enjoy fishing, so the ${s} answers would lean one way and not match all ${total} islanders. That is a biased sample: ${s} people met at the fishing spot. The other methods give everyone an equal chance.`,
+        : `People at the fishing spot are likely to enjoy fishing, so their ${s} answers would lean one way and not match all ${total} islanders. That is a biased sample: ${s} people met at the fishing spot. The other methods give every islander an equal chance (every 10th name of ${total} also gives ${s} names).`,
   },
   {
     id: "u06-every-nth-01",
@@ -342,8 +356,8 @@ export const UNIT_06: QuestionTemplate[] = [
     format: INT,
     params: (rng) => ({ n: int(rng, 4, 6), m: int(rng, 10, 20), d: int(rng, 1, 4) }),
     prompt: ({ n, m, d }, zone) =>
-      `The mean number of ${Z[zone].food} you catch per day over ${n} days is ${m}. After one more day the mean rises to ${m + d}. ` +
-      `How many did you catch on that last day?`,
+      `The mean number of ${Z[zone].food} you collect per day over ${n} days is ${m}. After one more day the mean rises to ${m + d}. ` +
+      `How many did you collect on that last day?`,
     expected: ({ n, m, d }) => (n + 1) * (m + d) - n * m,
     solution: ({ n, m, d }) =>
       `The first ${n} days total ${n} × ${m} = ${n * m}. After ${n + 1} days the total is ${n + 1} × ${m + d} = ${(n + 1) * (m + d)}. ` +
@@ -416,9 +430,9 @@ export const UNIT_06: QuestionTemplate[] = [
     },
     prompt: (p, zone) =>
       [
-        `${Z[zone].Place}, the ${Z[zone].food} you catch in six days are ${list(unpack(p, "w", 6))}. Which average best describes a typical day?`,
+        `${Z[zone].Place}, the ${Z[zone].food} you collect in six days are ${list(unpack(p, "w", 6))}. Which average best describes a typical day?`,
         `${Z[zone].Place}, a vote on sail colour gives red ${p.r + p.t}, blue ${p.r} and green ${p.s}. Which average tells you the most popular colour?`,
-        `${Z[zone].Place}, the ${Z[zone].food} caught on five days are ${list(unpack(p, "n", 5))}. You want to estimate the total for ${p.days} days. Which average helps most?`,
+        `${Z[zone].Place}, the ${Z[zone].food} collected on five days are ${list(unpack(p, "n", 5))}. You want to estimate the total for ${p.days} days. Which average helps most?`,
       ][p.k],
     options: () => AVERAGES,
     expected: ({ k }) => AVERAGES[[1, 2, 0][k]],
@@ -457,7 +471,7 @@ export const UNIT_06: QuestionTemplate[] = [
   {
     id: "u06-sample-estimate-01",
     unit: 6,
-    difficulty: 3,
+    difficulty: 2,
     resource: "wood",
     format: INT,
     params(rng) {
@@ -465,8 +479,8 @@ export const UNIT_06: QuestionTemplate[] = [
       return { s, x: int(rng, Math.ceil(s * 0.2), Math.floor(s * 0.8)), m: int(rng, 3, 9) };
     },
     prompt: ({ s, x, m }, zone) =>
-      `${Z[zone].Place}, you ask a random sample of ${s} islanders, and ${x} say they prefer ${Z[zone].food}. ` +
-      `There are ${s * m} islanders in total. Estimate how many of them prefer ${Z[zone].food}.`,
+      `${Z[zone].Place}, you ask a random sample of ${s} islanders, and ${x} say ${Z[zone].food} is their favourite food. ` +
+      `There are ${s * m} islanders in total. Estimate how many of them have ${Z[zone].food} as their favourite.`,
     expected: ({ x, m }) => x * m,
     solution: ({ s, x, m }) =>
       `The sample is ${s} out of ${s * m}, so the whole island is ${m} times bigger than the sample. If the sample is fair, about ${m} times as many prefer it: ${x} × ${m} = ${x * m}.`,
