@@ -2,12 +2,19 @@ import { describe, it, expect } from "vitest";
 import { UNIT_13 } from "@/content/units/unit-13";
 import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
 import { rankChecks, valueRankChecks } from "./helpers/rank";
+import { coordRankChecks } from "./helpers/rank2";
+import { sharedCoordChecks } from "./helpers/shared";
 
 bankChecks(13, UNIT_13);
 overlapChecks(UNIT_13);
 coordinateChecks(UNIT_13);
 rankChecks(UNIT_13);
 valueRankChecks(UNIT_13);
+coordRankChecks(
+  UNIT_13,
+  UNIT_13.filter((t) => t.format.kind === "choice" && t.id !== "u13-quadrant-01" && t.id !== "u13-find-rotation-01").map((t) => t.id),
+);
+sharedCoordChecks(UNIT_13, 6);
 
 const get = (id: string) => UNIT_13.find((t) => t.id === id)!;
 const MINUS = "−";
@@ -26,6 +33,44 @@ describe("unit 13 independent recompute", () => {
       const [[x, y]] = pairs(p);
       const fits = (o: string) => (o.startsWith("Right") ? x > 0 : x < 0) && (o.includes("above") ? y > 0 : y < 0);
       expect(opts!.filter(fits), where).toEqual([e]);
+    }));
+  it("fraction-length-01", () =>
+    run("u13-fraction-length-01", (p, e) => {
+      const [len, k] = numsIn(p.replace("1/", " ")).slice(0, 2);
+      expect(Number(e) * k).toBe(len);
+    }));
+  it("rotate-90-01: the key is the only option equal to the rotated point (90 or 270)", () =>
+    run("u13-rotate-90-01", (p, e, opts, where) => {
+      const [[x, y]] = pairs(p);
+      const angle = Number(/rotated (\d+)/.exec(p)![1]);
+      const anti = p.includes("anticlockwise");
+      const turns = (angle / 90) * (anti ? 1 : -1); // quarter turns anticlockwise
+      let [u, v] = [x, y];
+      for (let i = 0; i < (((turns % 4) + 4) % 4); i++) [u, v] = [-v, u];
+      expect(opts!.filter((o) => o === fmt(u, v)), where).toEqual([e]);
+    }));
+  it("rotate-centre-01", () =>
+    run("u13-rotate-centre-01", (p, e) => {
+      const [[px, py], [cx, cy]] = pairs(p);
+      const [dx, dy] = [px - cx, py - cy];
+      const turn = /180/.test(p) ? [-dx, -dy] : p.includes("anticlockwise") ? [-dy, dx] : [dy, -dx];
+      expect(Number(e)).toBe(/the y-coordinate/.test(p) ? cy + turn[1] : cx + turn[0]);
+      expect(Number(e)).toBeGreaterThan(0);
+    }));
+  it("enlarge-centre-01", () =>
+    run("u13-enlarge-centre-01", (p, e) => {
+      const [[px, py], [cx, cy]] = pairs(p);
+      const k = Number(/scale factor (\d+)/.exec(p)![1]);
+      expect(Number(e)).toBe(/the y-coordinate/.test(p) ? cy + k * (py - cy) : cx + k * (px - cx));
+      expect(Number(e)).toBeGreaterThan(0);
+    }));
+  it("enlarge-fraction-01: the image of P is whole and nearer to C", () =>
+    run("u13-enlarge-fraction-01", (p, e) => {
+      const [[px, py], [cx, cy]] = pairs(p);
+      const k = Number(/scale factor 1\/(\d+)/.exec(p)![1]);
+      expect(Math.abs((px - cx) % k)).toBe(0);
+      expect(Math.abs((py - cy) % k)).toBe(0);
+      expect(Number(e)).toBe(/the y-coordinate/.test(p) ? cy + (py - cy) / k : cx + (px - cx) / k);
     }));
   it("translate-point-01", () =>
     run("u13-translate-point-01", (p, e) => {
@@ -52,21 +97,6 @@ describe("unit 13 independent recompute", () => {
     run("u13-enlarge-length-01", (p, e) => {
       const [len, k] = numsIn(p);
       expect(Number(e)).toBe(len * k);
-    }));
-  it("midpoint-x-01", () =>
-    run("u13-midpoint-x-01", (p, e) => {
-      const [[ax], [bx]] = pairs(p);
-      expect(Number(e) * 2).toBe(ax + bx);
-    }));
-  it("rotate-90-01: the key is the only option equal to the rotated point", () =>
-    run("u13-rotate-90-01", (p, e, opts, where) => {
-      const [[x, y]] = pairs(p);
-      const anti = p.includes("anticlockwise");
-      const want = anti ? fmt(-y, x) : fmt(y, -x);
-      expect(opts!.filter((o) => o === want), where).toEqual([e]);
-      // turning the image back by the opposite quarter-turn gives P
-      const [[ix, iy]] = pairs(e as string);
-      expect(anti ? [iy, -ix] : [-iy, ix]).toEqual([x, y]);
     }));
   it("translation-find-01: applying the key to A gives A'", () =>
     run("u13-translation-find-01", (p, e, opts, where) => {
@@ -105,17 +135,6 @@ describe("unit 13 independent recompute", () => {
       expect(Math.abs((y1 + y2) % 2)).toBe(0);
       expect(e).toBe(fmt((x1 + x2) / 2 + 0, (y1 + y2) / 2 + 0));
     }));
-  it("rect-perimeter-01", () =>
-    run("u13-rect-perimeter-01", (p, e) => {
-      const [[x1, y1], [x2, y2]] = pairs(p);
-      expect(Number(e)).toBe(2 * (Math.abs(x2 - x1) + Math.abs(y2 - y1)));
-    }));
-  it("scale-find-01", () =>
-    run("u13-scale-find-01", (p, e) => {
-      const [a, b, c] = numsIn(p).slice(0, 3);
-      expect(b % a).toBe(0);
-      expect(Number(e)).toBe((b / a) * c);
-    }));
   it("two-step-01", () =>
     run("u13-two-step-01", (p, e) => {
       const [[x, y]] = pairs(p);
@@ -139,12 +158,6 @@ describe("unit 13 independent recompute", () => {
         rules[o] = o.startsWith("90° clockwise") ? [y, -x] : o.startsWith("90° anticlockwise") ? [-y, x] : o.startsWith("180") ? [-x, -y] : [y, x];
       }
       expect(opts!.filter((o) => rules[o][0] === c && rules[o][1] === d), where).toEqual([e]);
-    }));
-  it("enlarge-area-01", () =>
-    run("u13-enlarge-area-01", (p, e) => {
-      const [, , [w, h]] = pairs(p).length === 4 ? pairs(p) : [[0, 0], [0, 0], [0, 0]];
-      const k = Number(/scale factor (\d+)/.exec(p)![1]);
-      expect(Number(e)).toBe(w * h * k * k);
     }));
   it("bearing-chain-01: facing back is +180, then clockwise, and the result is below 360", () =>
     run("u13-bearing-chain-01", (p, e) => {

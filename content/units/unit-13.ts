@@ -14,6 +14,7 @@
 import type { QuestionTemplate } from "@/lib/questions/types";
 import { int } from "@/lib/questions/random";
 import { ZONE_WORDS as Z } from "@/content/units/zones";
+import { pickSet } from "@/content/units/pickset";
 
 const INT = { kind: "integer" } as const;
 const CHOICE = { kind: "choice", options: [] as string[] } as const;
@@ -36,18 +37,13 @@ const nz = (rng: () => number, lo: number, hi: number) => {
 };
 const sgn = (v: number) => (v < 0 ? -1 : 1);
 
-/** The key plus three distractors chosen from the candidates by the number s (different subsets on different seeds). */
+/** The key plus three distractors from the pool; s packs four random target ranks and a tie-break (see pickSet). */
 function mix(key: string, cands: string[], s: number): string[] {
-  const arr = [...new Set(cands)].filter((c) => c !== key);
-  let r = s;
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = r % (i + 1);
-    r = Math.floor(r / (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return [key, ...arr.slice(0, 3)];
+  return pickSet(key, cands, [s % 4, Math.floor(s / 4) % 4, Math.floor(s / 16) % 4, Math.floor(s / 64) % 4], Math.floor(s / 256));
 }
-const SEL = (rng: () => number) => int(rng, 0, 5039);
+const SEL = (rng: () => number) => int(rng, 0, 256 * 1000 - 1);
+/** Three-figure bearing text, e.g. 45 -> "045". */
+const b3 = (v: number) => String(v).padStart(3, "0");
 
 /** "3 right and 2 up" style text for a signed move. */
 const move = (dx: number, dy: number) => `${Math.abs(dx)} ${dx > 0 ? "right" : "left"} and ${Math.abs(dy)} ${dy > 0 ? "up" : "down"}`;
@@ -115,6 +111,9 @@ export const UNIT_13: QuestionTemplate[] = [
           pt(a + sgn(dx) * d, b + sgn(dy) * c),
           pt(b + dy, a + dx),
           pt(a + dx, b),
+          pt(a, b + dy),
+          pt(a - dx, b - dy),
+          pt(a + dy, b + dx),
         ],
         s,
       );
@@ -138,12 +137,12 @@ export const UNIT_13: QuestionTemplate[] = [
     format: INT,
     params: (rng) => ({ b: int(rng, 20, 200), t: int(rng, 30, 150) }),
     prompt: ({ b, t }, zone) =>
-      `${Z[zone].Place}, you stand facing a bearing of ${b}° (bearings are measured clockwise from north). ` +
+      `${Z[zone].Place}, you stand facing a bearing of ${b3(b)}° (bearings are measured clockwise from north). ` +
       `You turn clockwise through ${t}°. What bearing are you facing now, in degrees?`,
     expected: ({ b, t }) => b + t,
     solution: ({ b, t }) =>
       `Bearings are measured clockwise, so a clockwise turn adds to the bearing: ${b} + ${t} = ${b + t}. ` +
-      `You now face a bearing of ${b + t}°.`,
+      `You now face a bearing of ${b3(b + t)}°.`,
   },
   {
     id: "u13-reflect-vertex-01",
@@ -189,27 +188,18 @@ export const UNIT_13: QuestionTemplate[] = [
     solution: ({ len, k }) => `An enlargement multiplies every length by the scale factor: ${len} × ${k} = ${len * k}, so the side is ${len * k} cm.`,
   },
   {
-    id: "u13-midpoint-x-01",
+    id: "u13-fraction-length-01",
     unit: 13,
     difficulty: 1,
     resource: "food",
     format: INT,
-    params(rng) {
-      const x1 = int(rng, 1, 9);
-      return { x1, x2: x1 + 2 * int(rng, 1, 5), y1: int(rng, 1, 9), y2: int(rng, 1, 9), swap: int(rng, 0, 1) };
-    },
-    prompt: ({ x1, x2, y1, y2, swap }, zone) => {
-      const [p, q] = swap ? [pt(x2, y2), pt(x1, y1)] : [pt(x1, y1), pt(x2, y2)];
-      return (
-        `Near ${Z[zone].landmark}, a rope is stretched between stakes at A${p} and B${q}. ` +
-        `A flag is tied at the midpoint of the rope. What is the x-coordinate of the flag?`
-      );
-    },
-    expected: ({ x1, x2 }) => (x1 + x2) / 2,
-    solution: ({ x1, x2 }) => `The midpoint's x-coordinate is halfway between the x-coordinates: (${x1} + ${x2}) ÷ 2 = ${x1 + x2} ÷ 2 = ${(x1 + x2) / 2}.`,
+    params: (rng) => ({ m: int(rng, 2, 9), k: int(rng, 2, 6) }),
+    prompt: ({ m, k }, zone) =>
+      `${Z[zone].Place}, a pattern for a shelter panel has a side ${m * k} cm long. ` +
+      `You enlarge the pattern with scale factor 1/${k}, so it gets smaller. How long is that side now, in centimetres?`,
+    expected: ({ m }) => m,
+    solution: ({ m, k }) => `A scale factor of 1/${k} divides every length by ${k}: ${m * k} \u00f7 ${k} = ${m}, so the side is ${m} cm.`,
   },
-
-  // ---------------- Difficulty 2 ----------------
   {
     id: "u13-rotate-90-01",
     unit: 13,
@@ -220,20 +210,26 @@ export const UNIT_13: QuestionTemplate[] = [
       let a = nz(rng, -6, 6);
       let b = nz(rng, -6, 6);
       while (Math.abs(a) === Math.abs(b)) b = nz(rng, -6, 6);
-      return { a, b, dir: int(rng, 0, 1), s: SEL(rng) };
+      return { a, b, ang: int(rng, 0, 3), s: SEL(rng) };
     },
-    prompt: ({ a, b, dir }, zone) =>
-      `${Z[zone].Place}, you mark point P${pt(a, b)} on your grid map. P is rotated 90° ${dir ? "anticlockwise" : "clockwise"} ` +
+    // ang: 0 = 90 clockwise, 1 = 90 anticlockwise, 2 = 270 clockwise (= 90 anticlockwise), 3 = 270 anticlockwise (= 90 clockwise)
+    prompt: ({ a, b, ang }, zone) =>
+      `${Z[zone].Place}, you mark point P${pt(a, b)} on your grid map. P is rotated ${ang < 2 ? 90 : 270}\u00b0 ${ang % 2 ? "anticlockwise" : "clockwise"} ` +
       `about the origin O(0, 0). What are the coordinates of its image?`,
-    options: ({ a, b, dir, s }) => {
-      const key = dir ? pt(-b, a) : pt(b, -a);
-      return mix(key, [dir ? pt(b, -a) : pt(-b, a), pt(-a, -b), pt(b, a), pt(-a, b), pt(a, -b), pt(-b, -a)], s);
+    options: ({ a, b, ang, s }) => {
+      const cw = ang === 0 || ang === 3;
+      return mix(cw ? pt(b, -a) : pt(-b, a), [cw ? pt(-b, a) : pt(b, -a), pt(-a, -b), pt(b, a), pt(-a, b), pt(a, -b), pt(-b, -a), pt(a, b)], s);
     },
-    expected: ({ a, b, dir }) => (dir ? pt(-b, a) : pt(b, -a)),
-    solution: ({ a, b, dir }) =>
-      dir
-        ? `A 90° anticlockwise turn about the origin sends (x, y) to (${MINUS}y, x). So P${pt(a, b)} goes to ${pt(-b, a)}.`
-        : `A 90° clockwise turn about the origin sends (x, y) to (y, ${MINUS}x). So P${pt(a, b)} goes to ${pt(b, -a)}.`,
+    expected: ({ a, b, ang }) => (ang === 0 || ang === 3 ? pt(b, -a) : pt(-b, a)),
+    solution: ({ a, b, ang }) => {
+      const cw = ang === 0 || ang === 3;
+      return (
+        `${ang >= 2 ? `A 270\u00b0 ${ang === 2 ? "clockwise" : "anticlockwise"} turn is the same as a 90\u00b0 ${cw ? "clockwise" : "anticlockwise"} turn. ` : ""}` +
+        (cw
+          ? `A 90\u00b0 clockwise turn about the origin sends (x, y) to (y, ${MINUS}x). So P${pt(a, b)} goes to ${pt(b, -a)}.`
+          : `A 90\u00b0 anticlockwise turn about the origin sends (x, y) to (${MINUS}y, x). So P${pt(a, b)} goes to ${pt(-b, a)}.`)
+      );
+    },
   },
   {
     id: "u13-translation-find-01",
@@ -259,6 +255,15 @@ export const UNIT_13: QuestionTemplate[] = [
         move(sgn(dx) * Math.abs(dy), sgn(dy) * Math.abs(dx)),
       ];
       if (slip > 0) cands.push(move(sgn(dx) * slip, dy));
+      cands.push(move(dx + sgn(dx), dy), move(dx, dy + sgn(dy)), move(sgn(dx) * (Math.abs(dx) + 2), -dy), move(-dx, sgn(dy) * (Math.abs(dy) + 2)));
+      if (Math.abs(dx) > 1) cands.push(move(dx - sgn(dx), dy));
+      if (Math.abs(dy) > 1) cands.push(move(dx, dy - sgn(dy)));
+      if (Math.abs(dx) > 2) cands.push(move(dx - 2 * sgn(dx), -dy));
+      for (const [i, j] of [[1, -1], [-1, 1], [2, 1], [1, 2], [-1, -1], [1, 1]]) {
+        const ax = Math.abs(dx) + i;
+        const ay = Math.abs(dy) + j;
+        if (ax > 0 && ay > 0) cands.push(move(sgn(dx) * ax, sgn(dy) * ay), move(-sgn(dx) * ax, sgn(dy) * ay));
+      }
       return mix(move(dx, dy), cands, s);
     },
     expected: ({ dx, dy }) => move(dx, dy),
@@ -279,7 +284,7 @@ export const UNIT_13: QuestionTemplate[] = [
       return { th };
     },
     prompt: ({ th }, zone) =>
-      `${Z[zone].Place}, the bearing of ${Z[zone].landmark} from your camp is ${th}° (measured clockwise from north). ` +
+      `${Z[zone].Place}, the bearing of ${Z[zone].landmark} from your camp is ${b3(th)}° (measured clockwise from north). ` +
       `What is the bearing of your camp from ${Z[zone].landmark}, in degrees?`,
     expected: ({ th }) => (th < 180 ? th + 180 : th - 180),
     solution: ({ th }) =>
@@ -303,7 +308,7 @@ export const UNIT_13: QuestionTemplate[] = [
       `${Z[zone].Place}, a trap is at P${pt(a, b)} on your grid map. P is reflected in the vertical line x = ${m}. ` +
       `What are the coordinates of the image of P?`,
     options: ({ m, a, b, s }) =>
-      mix(pt(2 * m - a, b), [pt(-a, b), pt(m - a, b), pt(a, 2 * m - b), pt(2 * m - a, -b), pt(a, -b), pt(m + a, b)], s),
+      mix(pt(2 * m - a, b), [pt(-a, b), pt(m - a, b), pt(a, 2 * m - b), pt(2 * m - a, -b), pt(a, -b), pt(m + a, b), pt(-a, -b), pt(2 * m + a, b)], s),
     expected: ({ m, a, b }) => pt(2 * m - a, b),
     solution: ({ m, a, b }) => {
       const d = Math.abs(a - m);
@@ -329,7 +334,7 @@ export const UNIT_13: QuestionTemplate[] = [
       `${Z[zone].Place}, a marker at A${pt(a, b)} is enlarged with scale factor ${k} and the origin O(0, 0) as the centre of enlargement. ` +
       `What are the coordinates of the image of A?`,
     options: ({ a, b, k, s }) =>
-      mix(pt(k * a, k * b), [pt(a + k, b + k), pt(k * a, b), pt(a, k * b), pt(k * b, k * a), pt(-k * a, k * b), pt(k * a, -k * b)], s),
+      mix(pt(k * a, k * b), [pt(a + k, b + k), pt(k * b, k * a), pt(-k * a, -k * b), pt(k * a + k, k * b + k), pt(k * a, b), pt(a, k * b), pt(-k * a, k * b), pt(k * a, -k * b)], s),
     expected: ({ a, b, k }) => pt(k * a, k * b),
     solution: ({ a, b, k }) =>
       `With the origin as the centre, multiply both coordinates by the scale factor ${k}: ${n(a)} × ${k} = ${n(k * a)} and ${n(b)} × ${k} = ${n(k * b)}. ` +
@@ -364,43 +369,43 @@ export const UNIT_13: QuestionTemplate[] = [
       `y: (${plus(y1, y2)}) ÷ 2 = ${n(y1 + y2)} ÷ 2 = ${n((y1 + y2) / 2)}. The midpoint is ${pt((x1 + x2) / 2, (y1 + y2) / 2)}.`,
   },
   {
-    id: "u13-rect-perimeter-01",
+    id: "u13-rotate-centre-01",
     unit: 13,
     difficulty: 2,
     resource: "water",
     format: INT,
-    params(rng) {
-      const w = int(rng, 3, 9);
-      let h = int(rng, 2, 8);
-      if (h === w) h = w === 9 ? 2 : w + 1;
-      const x1 = int(rng, -6, 2);
-      const y1 = int(rng, -5, 2);
-      return { x1, y1, x2: x1 + w, y2: y1 + h };
+    params: (rng) => ({ cx: int(rng, 4, 8), cy: int(rng, 4, 8), a: nz(rng, -3, 3), b: nz(rng, -3, 3), rot: int(rng, 0, 2), ask: int(rng, 0, 1) }),
+    prompt: ({ cx, cy, a, b, rot, ask }, zone) =>
+      `${Z[zone].Place}, point P${pt(cx + a, cy + b)} is rotated ${rot === 2 ? "180" : "90"}\u00b0${rot === 0 ? " clockwise" : rot === 1 ? " anticlockwise" : ""} ` +
+      `about the centre C${pt(cx, cy)}. What is the ${ask ? "y" : "x"}-coordinate of the image of P?`,
+    expected: ({ cx, cy, a, b, rot, ask }) => {
+      const o = rot === 0 ? [b, -a] : rot === 1 ? [-b, a] : [-a, -b];
+      return ask ? cy + o[1] : cx + o[0];
     },
-    prompt: ({ x1, y1, x2, y2 }, zone) =>
-      `${Z[zone].Place}, a rectangular garden has sides parallel to the grid lines. Opposite corners are A${pt(x1, y1)} and C${pt(x2, y2)}. ` +
-      `Each grid square is 1 m wide. What length of fence goes all the way round it, in metres?`,
-    expected: ({ x1, y1, x2, y2 }) => 2 * (x2 - x1 + (y2 - y1)),
-    solution: ({ x1, y1, x2, y2 }) =>
-      `Width: ${sub(x2, x1)} = ${x2 - x1}. Height: ${sub(y2, y1)} = ${y2 - y1}. ` +
-      `Perimeter = 2 × (${x2 - x1} + ${y2 - y1}) = 2 × ${x2 - x1 + (y2 - y1)} = ${2 * (x2 - x1 + (y2 - y1))} metres.`,
+    solution: ({ cx, cy, a, b, rot, ask }) => {
+      const o = rot === 0 ? [b, -a] : rot === 1 ? [-b, a] : [-a, -b];
+      const rule = rot === 0 ? `(x, y) \u2192 (y, ${MINUS}x)` : rot === 1 ? `(x, y) \u2192 (${MINUS}y, x)` : `(x, y) \u2192 (${MINUS}x, ${MINUS}y)`;
+      return (
+        `Measure from C: P is at ${pt(a, b)} relative to C. The turn sends ${rule}, so the image is at ${pt(o[0], o[1])} relative to C. ` +
+        `Add C back: x = ${shift(cx, o[0])}, y = ${shift(cy, o[1])}. The ${ask ? "y" : "x"}-coordinate is ${ask ? cy + o[1] : cx + o[0]}.`
+      );
+    },
   },
   {
-    id: "u13-scale-find-01",
+    id: "u13-enlarge-centre-01",
     unit: 13,
     difficulty: 2,
     resource: "food",
     format: INT,
-    params: (rng) => ({ len: int(rng, 2, 9), k: int(rng, 2, 7), m: int(rng, 3, 11) }),
-    prompt: ({ len, k, m }, zone) =>
-      `${Z[zone].Place}, an enlargement turns a side of a net pattern from ${len} cm into ${len * k} cm. ` +
-      `The same enlargement is applied to another side that is ${m} cm long. How long is that side after the enlargement, in centimetres?`,
-    expected: ({ k, m }) => k * m,
-    solution: ({ len, k, m }) =>
-      `The scale factor is ${len * k} ÷ ${len} = ${k}. The other side becomes ${m} × ${k} = ${k * m} cm.`,
+    params: (rng) => ({ cx: int(rng, 8, 12), cy: int(rng, 8, 12), a: nz(rng, -2, 2), b: nz(rng, -2, 2), k: int(rng, 2, 3), ask: int(rng, 0, 1) }),
+    prompt: ({ cx, cy, a, b, k, ask }, zone) =>
+      `${Z[zone].Place}, point P${pt(cx + a, cy + b)} is enlarged with scale factor ${k} and centre C${pt(cx, cy)}. ` +
+      `What is the ${ask ? "y" : "x"}-coordinate of the image of P?`,
+    expected: ({ cx, cy, a, b, k, ask }) => (ask ? cy + k * b : cx + k * a),
+    solution: ({ cx, cy, a, b, k, ask }) =>
+      `Measure from C: P is at ${pt(a, b)} relative to C. Multiply by ${k}: ${pt(k * a, k * b)}. ` +
+      `Add C back: x = ${shift(cx, k * a)}, y = ${shift(cy, k * b)}. The ${ask ? "y" : "x"}-coordinate is ${ask ? cy + k * b : cx + k * a}.`,
   },
-
-  // ---------------- Difficulty 3 ----------------
   {
     id: "u13-two-step-01",
     unit: 13,
@@ -515,19 +520,19 @@ export const UNIT_13: QuestionTemplate[] = [
     },
   },
   {
-    id: "u13-enlarge-area-01",
+    id: "u13-enlarge-fraction-01",
     unit: 13,
     difficulty: 3,
     resource: "wood",
     format: INT,
-    params: (rng) => ({ w: int(rng, 2, 6), h: int(rng, 2, 5), k: int(rng, 2, 4) }),
-    prompt: ({ w, h, k }, zone) =>
-      `${Z[zone].Place}, a plot has corners O(0, 0), P(${w}, 0), Q(${w}, ${h}) and R(0, ${h}); one unit is 1 metre. ` +
-      `It is enlarged with scale factor ${k} and centre O. What is the area of the enlarged plot, in square metres?`,
-    expected: ({ w, h, k }) => k * w * (k * h),
-    solution: ({ w, h, k }) =>
-      `Every length is multiplied by ${k}, so the enlarged plot is ${k * w} m by ${k * h} m. ` +
-      `Area = ${k * w} × ${k * h} = ${k * w * k * h} square metres.`,
+    params: (rng) => ({ cx: int(rng, 14, 18), cy: int(rng, 14, 18), a: nz(rng, -3, 3), b: nz(rng, -3, 3), k: int(rng, 2, 4), ask: int(rng, 0, 1) }),
+    prompt: ({ cx, cy, a, b, k, ask }, zone) =>
+      `${Z[zone].Place}, point P${pt(cx + k * a, cy + k * b)} is enlarged with scale factor 1/${k} and centre C${pt(cx, cy)}. ` +
+      `What is the ${ask ? "y" : "x"}-coordinate of the image of P?`,
+    expected: ({ cx, cy, a, b, ask }) => (ask ? cy + b : cx + a),
+    solution: ({ cx, cy, a, b, k, ask }) =>
+      `Measure from C: P is at ${pt(k * a, k * b)} relative to C. A scale factor of 1/${k} divides by ${k}: ${pt(a, b)}. ` +
+      `Add C back: x = ${shift(cx, a)}, y = ${shift(cy, b)}. The ${ask ? "y" : "x"}-coordinate is ${ask ? cy + b : cx + a}.`,
   },
   {
     id: "u13-bearing-chain-01",
@@ -542,14 +547,14 @@ export const UNIT_13: QuestionTemplate[] = [
       return { th, t };
     },
     prompt: ({ th, t }, zone) =>
-      `${Z[zone].Place}, the bearing of ${Z[zone].landmark} from your camp is ${th}°. You walk there, turn to face directly back at your camp, ` +
+      `${Z[zone].Place}, the bearing of ${Z[zone].landmark} from your camp is ${b3(th)}°. You walk there, turn to face directly back at your camp, ` +
       `then turn clockwise through ${t}°. What bearing are you now facing, in degrees?`,
     expected: ({ th, t }) => (th + 180 + t) % 360,
     solution: ({ th, t }) => {
       const raw = th + 180 + t;
       return (
         `Facing back at camp, your bearing is ${th} + 180 = ${th + 180}. A clockwise turn of ${t} adds ${t}: ${th + 180} + ${t} = ${raw}. ` +
-        (raw >= 360 ? `A bearing must be less than 360, so subtract 360: ${raw} ${MINUS} 360 = ${raw - 360}.` : `So you face a bearing of ${raw}°.`)
+        (raw >= 360 ? `A bearing must be less than 360, so subtract 360: ${raw} ${MINUS} 360 = ${raw - 360}.` : `So you face a bearing of ${b3(raw)}°.`)
       );
     },
   },
@@ -578,26 +583,29 @@ export const UNIT_13: QuestionTemplate[] = [
     },
     options: ({ dx, dy, same, which, e, s }) => {
       const [qx, qy] = same ? [dx, dy] : which === 0 ? [dx + e, dy] : [dx, dy + e];
+      const nzv = (v: number, alt: number) => (v === 0 ? alt : v);
+      const fakes = [
+        [nzv(dx + 1, dx - 1), dy],
+        [nzv(dx - 1, dx + 1), dy],
+        [dx, nzv(dy + 1, dy - 1)],
+        [dx, nzv(dy - 1, dy + 1)],
+        [sgn(dx) * Math.abs(dy), sgn(dy) * Math.abs(dx)],
+        [-dx, dy],
+        [dx, -dy],
+        [nzv(dx + 2 * sgn(dx), 1), nzv(dy - sgn(dy), 2)],
+      ];
+      const yes = (x: number, y: number) => `Yes: both move ${moveShort(x, y)}`;
+      const no = (a: number, b: number, c: number, d: number) => `No: P ${moveShort(a, b)}, Q ${moveShort(c, d)}`;
       if (same) {
         return mix(
-          `Yes: both move ${moveShort(dx, dy)}`,
-          [
-            `No: P ${moveShort(dx, dy)}, Q ${moveShort(dx + (dx + 1 === 0 ? -1 : 1), dy)}`,
-            `No: P ${moveShort(dx, dy)}, Q ${moveShort(dx, dy + (dy + 1 === 0 ? -1 : 1))}`,
-            `Yes: both move ${moveShort(sgn(dx) * Math.abs(dy), sgn(dy) * Math.abs(dx))}`,
-            `Yes: both move ${moveShort(-dx, dy)}`,
-          ],
+          yes(dx, dy),
+          [...fakes.slice(0, 6).map(([x, y]) => no(dx, dy, x, y)), ...fakes.slice(0, 6).map(([x, y]) => no(x, y, dx, dy)), ...fakes.map(([x, y]) => yes(x, y))],
           s,
         );
       }
       return mix(
-        `No: P ${moveShort(dx, dy)}, Q ${moveShort(qx, qy)}`,
-        [
-          `Yes: both move ${moveShort(dx, dy)}`,
-          `Yes: both move ${moveShort(qx, qy)}`,
-          `No: P ${moveShort(qx, qy)}, Q ${moveShort(dx, dy)}`,
-          `No: P ${moveShort(dx, dy)}, Q ${moveShort(-qx, qy)}`,
-        ],
+        no(dx, dy, qx, qy),
+        [yes(dx, dy), yes(qx, qy), no(qx, qy, dx, dy), ...fakes.map(([x, y]) => no(dx, dy, x, y)), ...fakes.slice(0, 4).map(([x, y]) => yes(x, y)), ...fakes.slice(0, 6).map(([x, y]) => no(x, y, qx, qy))],
         s,
       );
     },
