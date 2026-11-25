@@ -70,6 +70,38 @@ export function overlapChecks(bank: QuestionTemplate[]) {
   });
 }
 
+/**
+ * For choice templates whose options contain numbers, the key must not be the unique maximum or unique
+ * minimum in the same numeric coordinate (k-th number in the option) on nearly every seed.
+ * Exceptions (ordered by construction, answer position follows from the maths): listed in `allow`.
+ */
+export function coordinateChecks(bank: QuestionTemplate[], allow: string[] = []) {
+  describe("key is not always extreme in a numeric coordinate", () => {
+    for (const t of bank.filter((x) => x.format.kind === "choice" && !allow.includes(x.id))) {
+      it(`${t.id}`, () => {
+        const maxN: number[] = [], minN: number[] = [], seen: number[] = [];
+        eachQuestion(t, ({ publicQ, expected }) => {
+          const opts = publicQ.options!;
+          const nums = opts.map((o) => numsIn(o));
+          const key = opts.indexOf(expected as string);
+          const dim = Math.min(...nums.map((n) => n.length));
+          for (let k = 0; k < dim; k++) {
+            const col = nums.map((n) => n[k]);
+            seen[k] = (seen[k] ?? 0) + 1;
+            const others = col.filter((_, i) => i !== key);
+            if (col[key] > Math.max(...others)) maxN[k] = (maxN[k] ?? 0) + 1;
+            if (col[key] < Math.min(...others)) minN[k] = (minN[k] ?? 0) + 1;
+          }
+        }, SEEDS_200.slice(0, 100));
+        for (let k = 0; k < seen.length; k++) {
+          expect((maxN[k] ?? 0) / seen[k], `key is the unique max of number ${k + 1}`).toBeLessThan(0.9);
+          expect((minN[k] ?? 0) / seen[k], `key is the unique min of number ${k + 1}`).toBeLessThan(0.9);
+        }
+      });
+    }
+  });
+}
+
 /** Structural checks shared by every unit bank. */
 export function bankChecks(unit: number, bank: QuestionTemplate[]) {
   const nn = String(unit).padStart(2, "0");

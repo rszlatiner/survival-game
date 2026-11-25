@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_01 } from "@/content/units/unit-01";
-import { bankChecks, overlapChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
 
 bankChecks(1, UNIT_01);
 overlapChecks(UNIT_01);
+coordinateChecks(UNIT_01);
 
 const get = (id: string) => UNIT_01.find((t) => t.id === id)!;
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
