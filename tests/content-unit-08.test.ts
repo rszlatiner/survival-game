@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_08 } from "@/content/units/unit-08";
 import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
-import { rankChecks } from "./helpers/rank";
+import { rankChecks, valueRankChecks } from "./helpers/rank";
 
 bankChecks(8, UNIT_08);
 overlapChecks(UNIT_08);
 coordinateChecks(UNIT_08);
 rankChecks(UNIT_08);
+valueRankChecks(UNIT_08);
 
 const get = (id: string) => UNIT_08.find((t) => t.id === id)!;
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
@@ -105,13 +106,17 @@ describe("unit 8 independent recompute", () => {
       const [n, d, total] = numsIn(p);
       expect(Number(e) * n).toBe(total * d);
     }));
-  it("order-01: the chosen fraction beats the other three", () =>
+  it("order-01: the key has the asked-for place in the order, by cross-multiplying", () =>
     run("u08-order-01", (p, e, opts, where) => {
-      const fr = (opts as string[]).map(parse);
+      const words = ["second shortest", "second longest", "shortest", "longest"];
+      const word = words.find((w) => new RegExp(`the ${w} one`).test(p))!;
+      const rank = { shortest: 0, "second shortest": 1, "second longest": 2, longest: 3 }[word as "shortest"];
+      const fr = opts!.map(parse);
       const win = parse(e as string);
-      for (const f of fr) if (f !== win && !(f[0] === win[0] && f[1] === win[1])) expect(f[0] * win[1], where).toBeLessThan(win[0] * f[1]);
+      const below = fr.filter((f) => f[0] * win[1] < win[0] * f[1]).length;
+      expect(below, where).toBe(rank);
       expect(opts).toHaveLength(4);
-      expect(numsIn(p).length).toBe(8);
+      expect(numsIn(p.replace(/second/, "")).length).toBe(8);
     }));
   it("decimal-to-fraction-01", () =>
     run("u08-decimal-to-fraction-01", (p, e, opts, where) => {

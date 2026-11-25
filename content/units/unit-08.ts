@@ -69,6 +69,42 @@ function simp(n: number, d: number): string {
   const f = fmt(n, d);
   return f === `${n}/${d}` ? `${n}/${d} (already in simplest form)` : `${n}/${d} = ${f}`;
 }
+type Fr = [number, number];
+/**
+ * Options for a fraction question: the key plus three wrong answers from `pool` (typical slips, each a [top, bottom]).
+ * `p.r` (0 to 3) is how many wrong answers are smaller in value than the key, so the key's value rank is spread evenly.
+ */
+function ranked(p: Record<string, number>, key: Fr, pool: Fr[]): string[] {
+  const kv = key[0] / key[1];
+  const keyS = fmt(key[0], key[1]);
+  const seen = new Set([keyS]);
+  const below: string[] = [];
+  const above: string[] = [];
+  for (const i of order(p, pool.length)) {
+    const [n, d] = pool[i];
+    if (!(n > 0 && d > 0)) continue;
+    const str = fmt(n, d);
+    if (seen.has(str)) continue;
+    seen.add(str);
+    const v = n / d;
+    if (Math.abs(v - kv) < 1e-9) continue;
+    (v < kv ? below : above).push(str);
+  }
+  let nb = Math.min(p.r, below.length);
+  let na = 3 - nb;
+  if (na > above.length) {
+    na = above.length;
+    nb = Math.min(below.length, 3 - na);
+  }
+  return [keyS, ...below.slice(0, nb), ...above.slice(0, na)];
+}
+const ORDER_WORDS = ["shortest", "second shortest", "second longest", "longest"];
+/** The four fractions of an ordering question, shortest first. */
+const ascending = (p: Record<string, number>) =>
+  [1, 2, 3, 4]
+    .map((i) => [p[`n${i}`], p[`d${i}`]])
+    .sort((x, y) => x[0] * y[1] - y[0] * x[1])
+    .map(([n, d]) => `${n}/${d}`);
 const parts = (n: number) => (n === 1 ? "1 part" : `${n} parts`);
 export const UNIT_08: QuestionTemplate[] = [
   // ---------------- Difficulty 1 ----------------
@@ -83,7 +119,7 @@ export const UNIT_08: QuestionTemplate[] = [
       return { n: numer(rng, d), d, k: int(rng, 2, 9) };
     },
     prompt: ({ n, d, k }, zone) =>
-      `${Z[zone].Place}, you catch ${d * k} ${Z[zone].food} and keep ${n}/${d} of them. How many do you keep?`,
+      `${Z[zone].Place}, you gather ${d * k} ${Z[zone].food} and keep ${n}/${d} of them. How many do you keep?`,
     expected: ({ n, k }) => n * k,
     solution: ({ n, d, k }) =>
       `Split ${d * k} into ${d} equal parts: ${d * k} ÷ ${d} = ${k} in each part. Then take ${parts(n)}: ${n} ${T} ${k} = ${n * k}.`,
@@ -112,11 +148,11 @@ export const UNIT_08: QuestionTemplate[] = [
     format: CHOICE,
     params(rng) {
       const [a, b] = coprimePair(rng, 1, 9, true);
-      return { a, b, g: int(rng, 2, 6), ...perm(rng, 4) };
+      return { a, b, g: int(rng, 2, 6), r: int(rng, 0, 3), ...perm(rng, 6) };
     },
     prompt: ({ a, b, g }, zone) =>
       `${g * b} ${Z[zone].stone} are in a pile, and ${g * a} of them are flat. Write ${g * a}/${g * b} in its simplest form.`,
-    options: (p) => withDistractors(`${p.a}/${p.b}`, shuffledCands(p, [fmt(p.b, p.a), fmt(p.a, p.g * p.b), fmt(p.g * p.a, p.b), fmt(p.a + 1, p.b + 1)])),
+    options: (p) => ranked(p, [p.a, p.b], [[p.b, p.a], [p.g * p.a, p.b], [p.a + 1, p.b + 1], [p.a, p.g * p.b], [p.a, p.b + 1], [p.a, 2 * p.b]]),
     expected: ({ a, b }) => `${a}/${b}`,
     solution: ({ a, b, g }) =>
       `Divide the top and the bottom by their highest common factor, ${g}: ${g * a} ÷ ${g} = ${a} and ${g * b} ÷ ${g} = ${b}. So ${g * a}/${g * b} = ${a}/${b}.`,
@@ -147,19 +183,19 @@ export const UNIT_08: QuestionTemplate[] = [
         const d = int(rng, 5, 12);
         const a = numer(rng, d);
         const b = numer(rng, d);
-        if (a + b < d) return { a, b, d, ...perm(rng, 5) };
+        if (a + b < d) return { a, b, d, r: int(rng, 0, 3), ...perm(rng, 10) };
       }
-      return { a: 1, b: 2, d: 7, ...perm(rng, 5) };
+      return { a: 1, b: 2, d: 7, r: 1, ...perm(rng, 10) };
     },
     prompt: ({ a, b, d }, zone) =>
       `${Z[zone].Place}, you eat ${a}/${d} of your ${Z[zone].food} in the morning and ${b}/${d} in the evening. What fraction have you eaten in total? ${SIMPLEST}`,
     options: (p) => {
       const { a, b, d } = p;
-      return withDistractors(fmt(a + b, d), shuffledCands(p, [fmt(a + b, 2 * d), fmt(a + b + 1, d), fmt(a * b, d), fmt(a + b - 1, d), fmt(a + b, d + 1)]));
+      return ranked(p, [a + b, d], [[a + b, 2 * d], [a + b - 1, d], [a * b, d], [a + b + 1, d], [a + b, d - 1], [a + b + 2, d], [a, d], [a + b, d + 1], [d - a - b, d], [2 * (a + b), d]]);
     },
     expected: ({ a, b, d }) => fmt(a + b, d),
     solution: ({ a, b, d }) =>
-      `The denominators are the same, so add the tops and keep the bottom: ${a}/${d} + ${b}/${d} = ${a + b}/${d}. In simplest form that is ${simp(a + b, d).includes("already") ? `${a + b}/${d}, which is already in simplest form` : fmt(a + b, d)}.`,
+      `The denominators are the same, so add the tops and keep the bottom. So ${a}/${d} + ${b}/${d} = ${simp(a + b, d)}.`,
   },
   {
     id: "u08-remaining-01",
@@ -187,20 +223,13 @@ export const UNIT_08: QuestionTemplate[] = [
     format: CHOICE,
     params(rng) {
       const [b, d] = pick(rng, PAIRS);
-      return { a: numer(rng, b), b, c: numer(rng, d), d, ...perm(rng, 6) };
+      return { a: numer(rng, b), b, c: numer(rng, d), d, r: int(rng, 0, 3), ...perm(rng, 9) };
     },
     prompt: ({ a, b, c, d }, zone) =>
       `A wall ${Z[zone].place} is ${a}/${b} built on Monday and a further ${c}/${d} of the wall is built on Tuesday. What fraction is built altogether? ${SIMPLEST}`,
     options: (p) => {
       const { a, b, c, d } = p;
-      return withDistractors(fmt(a * d + b * c, b * d), shuffledCands(p, [
-        fmt(a + c, b + d),
-        fmt(a * d + b * c, b + d),
-        fmt(a * d + b * c, b * d + 1),
-        fmt(a + c, b * d),
-        fmt(a * d + b * c + 1, b * d),
-        fmt(a * d + b * c - 1, b * d),
-      ]));
+      return ranked(p, [a * d + b * c, b * d], [[a + c, b + d], [a * d + b * c, b + d], [a + c, Math.min(b, d)], [a + c, b * d], [a * d + b * c + 1, b * d], [a * d + b * c - 1, b * d], [a * c, b * d], [a * d + b * c, b * d + 1], [a * d + b * c, Math.max(b, d)]]);
     },
     expected: ({ a, b, c, d }) => fmt(a * d + b * c, b * d),
     solution: ({ a, b, c, d }) =>
@@ -218,21 +247,15 @@ export const UNIT_08: QuestionTemplate[] = [
         const [b, d] = pick(rng, PAIRS);
         const a = numer(rng, b);
         const c = numer(rng, d);
-        if (a * d > b * c + 1) return { a, b, c, d, ...perm(rng, 5) };
+        if (a * d > b * c + 1) return { a, b, c, d, r: int(rng, 0, 3), ...perm(rng, 7) };
       }
-      return { a: 3, b: 4, c: 1, d: 3, ...perm(rng, 5) };
+      return { a: 3, b: 4, c: 1, d: 3, r: 1, ...perm(rng, 7) };
     },
     prompt: ({ a, b, c, d }, zone) =>
       `A tank of ${Z[zone].water} is ${a}/${b} full. You use ${c}/${d} of a tank. What fraction of a tank is left? ${SIMPLEST}`,
     options: (p) => {
       const { a, b, c, d } = p;
-      return withDistractors(fmt(a * d - b * c, b * d), shuffledCands(p, [
-        fmt(a * d - c, b * d),
-        fmt(a * d - b * c + 1, b * d),
-        fmt(a * d - b * c, b + d),
-        fmt(a * d + b * c, b * d),
-        fmt(a * d - b * c - 1, b * d),
-      ]));
+      return ranked(p, [a * d - b * c, b * d], [[a * d - c, b * d], [a * d - b * c + 1, b * d], [a * d - b * c - 1, b * d], [a * d - b * c, b + d], [a * d + b * c, b * d], [a * d - b * c, b * d + 1], [a * d - b * c, 2 * b * d]]);
     },
     expected: ({ a, b, c, d }) => fmt(a * d - b * c, b * d),
     solution: ({ a, b, c, d }) =>
@@ -286,13 +309,13 @@ export const UNIT_08: QuestionTemplate[] = [
     params(rng) {
       const b = int(rng, 2, 6);
       const d = int(rng, 2, 6);
-      return { a: numer(rng, b), b, c: numer(rng, d), d, ...perm(rng, 5) };
+      return { a: numer(rng, b), b, c: numer(rng, d), d, r: int(rng, 0, 3), ...perm(rng, 8) };
     },
     prompt: ({ a, b, c, d }, zone) =>
       `${c}/${d} of a plot ${Z[zone].place} is cleared for ${Z[zone].stone}, and ${a}/${b} of that cleared part holds large ones. What fraction of the whole plot holds large ${Z[zone].stone}? ${SIMPLEST}`,
     options: (p) => {
       const { a, b, c, d } = p;
-      return withDistractors(fmt(a * c, b * d), shuffledCands(p, [fmt(a * c, b + d), fmt(a + c, b * d), fmt(a * d, b * c), fmt(a * c, b * d + 1), fmt(a * c + 1, b * d)]));
+      return ranked(p, [a * c, b * d], [[a * c, b + d], [a + c, b * d], [a * d, b * c], [a * c + 1, b * d], [a * c, b * d + 1], [a * c, 2 * b * d], [a * c - 1, b * d], [a * c, b * d + b + d]]);
     },
     expected: ({ a, b, c, d }) => fmt(a * c, b * d),
     solution: ({ a, b, c, d }) =>
@@ -328,29 +351,18 @@ export const UNIT_08: QuestionTemplate[] = [
         });
         if (fr.some(([n, d]) => gcd(n, d) !== 1)) continue;
         const vals = fr.map(([n, d]) => n / d);
-        const top = Math.max(...vals);
         if (new Set(vals.map((v) => Math.round(v * 1e6))).size !== 4) continue;
-        if (vals.filter((v) => Math.abs(v - top) < 1e-9).length !== 1) continue;
-        // Half the time insist the longest piece does not have the biggest top number, so the top number is no clue.
-        const win = fr[vals.indexOf(top)][0];
-        if (rng() < 0.5 && win >= Math.max(...fr.map((x) => x[0]))) continue;
-        return { n1: fr[0][0], d1: fr[0][1], n2: fr[1][0], d2: fr[1][1], n3: fr[2][0], d3: fr[2][1], n4: fr[3][0], d4: fr[3][1] };
+        return { n1: fr[0][0], d1: fr[0][1], n2: fr[1][0], d2: fr[1][1], n3: fr[2][0], d3: fr[2][1], n4: fr[3][0], d4: fr[3][1], k: int(rng, 0, 3) };
       }
-      return { n1: 1, d1: 2, n2: 2, d2: 5, n3: 3, d3: 4, n4: 1, d4: 3 };
+      return { n1: 1, d1: 2, n2: 2, d2: 5, n3: 3, d3: 4, n4: 1, d4: 3, k: 3 };
     },
-    prompt: ({ n1, d1, n2, d2, n3, d3, n4, d4 }, zone) =>
-      `Four ${Z[zone].wood} are cut to ${n1}/${d1}, ${n2}/${d2}, ${n3}/${d3} and ${n4}/${d4} of a metre. Which fraction shows the longest one?`,
+    prompt: ({ n1, d1, n2, d2, n3, d3, n4, d4, k }, zone) =>
+      `Four ${Z[zone].wood} are cut to ${n1}/${d1}, ${n2}/${d2}, ${n3}/${d3} and ${n4}/${d4} of a metre. Which fraction shows the ${ORDER_WORDS[k]} one?`,
     options: ({ n1, d1, n2, d2, n3, d3, n4, d4 }) => [`${n1}/${d1}`, `${n2}/${d2}`, `${n3}/${d3}`, `${n4}/${d4}`],
-    expected: ({ n1, d1, n2, d2, n3, d3, n4, d4 }) => {
-      const f = [[n1, d1], [n2, d2], [n3, d3], [n4, d4]];
-      const best = f.reduce((m, x) => (x[0] * m[1] > m[0] * x[1] ? x : m));
-      return `${best[0]}/${best[1]}`;
-    },
-    solution: ({ n1, d1, n2, d2, n3, d3, n4, d4 }) => {
-      const f = [[n1, d1], [n2, d2], [n3, d3], [n4, d4]];
-      const best = f.reduce((m, x) => (x[0] * m[1] > m[0] * x[1] ? x : m));
-      return `Compare them as decimals: ${f.map(([n, d]) => `${n}/${d} ≈ ${(n / d).toFixed(2)}`).join(", ")}. The largest is ${best[0]}/${best[1]}.`;
-    },
+    expected: (p) => ascending(p)[p.k],
+    solution: (p) =>
+      `Compare them as decimals: ${[1, 2, 3, 4].map((i) => `${p[`n${i}`]}/${p[`d${i}`]} ≈ ${(p[`n${i}`] / p[`d${i}`]).toFixed(2)}`).join(", ")}. ` +
+      `From shortest to longest the order is ${ascending(p).join(", ")}, so the ${ORDER_WORDS[p.k]} is ${ascending(p)[p.k]}.`,
   },
   {
     id: "u08-decimal-to-fraction-01",
@@ -361,13 +373,13 @@ export const UNIT_08: QuestionTemplate[] = [
     params(rng) {
       for (let i = 0; i < 100; i++) {
         const h = int(rng, 4, 96);
-        if (gcd(h, 100) > 1) return { h, ...perm(rng, 4) };
+        if (gcd(h, 100) > 1) return { h, r: int(rng, 0, 3), ...perm(rng, 8) };
       }
-      return { h: 35, ...perm(rng, 4) };
+      return { h: 35, r: 1, ...perm(rng, 8) };
     },
     prompt: ({ h }, zone) =>
       `${Z[zone].Place}, a pot is ${(h / 100).toFixed(2)} full of ${Z[zone].food}. Write ${(h / 100).toFixed(2)} as a fraction in its simplest form.`,
-    options: (p) => withDistractors(fmt(p.h, 100), shuffledCands(p, [fmt(p.h, 10), fmt(p.h, 1000), `1/${p.h}`, fmt(100 - p.h, 100)])),
+    options: (p) => ranked(p, [p.h, 100], [[p.h, 10], [p.h, 50], [100, p.h], [p.h, 1000], [p.h, 200], [p.h, 500], [1, p.h], [100 - p.h, 100]]),
     expected: ({ h }) => fmt(h, 100),
     solution: ({ h }) =>
       `${(h / 100).toFixed(2)} means ${h} hundredths, which is ${h}/100. Divide the top and bottom by ${gcd(h, 100)}: ${fmt(h, 100)}.`,
@@ -424,22 +436,28 @@ export const UNIT_08: QuestionTemplate[] = [
     format: CHOICE,
     params(rng) {
       const [b, d] = pick(rng, PAIRS);
-      return { w1: int(rng, 1, 4), a: numer(rng, b), b, w2: int(rng, 1, 4), c: numer(rng, d), d, ...perm(rng, 4) };
+      return { w1: int(rng, 1, 4), a: numer(rng, b), b, w2: int(rng, 1, 4), c: numer(rng, d), d, r: int(rng, 0, 3), ...perm(rng, 10) };
     },
     prompt: ({ w1, a, b, w2, c, d }, zone) =>
       `${Z[zone].Place}, you carry ${w1} ${a}/${b} kg of ${Z[zone].food} to camp, then ${w2} ${c}/${d} kg more. How many kilograms is that in total? ${SIMPLEST}`,
     options: (p) => {
       const { w1, a, b, w2, c, d } = p;
+      const S = w1 + w2;
       const den = b * d;
-      const total = (w1 + w2) * den + a * d + c * b;
-      const whole = Math.floor(total / den);
-      const frac = fmt(total % den, den);
-      return withDistractors(fmt(total, den), shuffledCands(p, [
-        `${w1 + w2} ${fmt(a + c, b + d)}`,
-        `${whole + 1} ${frac}`,
-        `${whole - 1} ${frac}`,
-        `${w1 + w2} ${fmt(Math.abs(a * d - c * b), den)}`,
-      ]));
+      const top = a * d + c * b;
+      const total = S * den + top;
+      return ranked(p, [total, den], [
+        [S * (b + d) + a + c, b + d], // added tops and bottoms of the fractions
+        top >= den ? [S * den + top - den, den] : [(S + 1) * den + top, den], // forgot to carry, or carried when not needed
+        [(w1 * b + a) * (w2 * d + c), den], // multiplied instead of added
+        [S * den + a * c, den], // multiplied the fraction parts
+        [Math.abs((w1 * b + a) * d - (w2 * d + c) * b), den], // subtracted
+        [total + 1, den],
+        [total - 1, den],
+        [total, den + b + d],
+        [w1 * b + a + w2 * d + c, b + d],
+        [total, den - 1],
+      ]);
     },
     expected: ({ w1, a, b, w2, c, d }) => fmt((w1 + w2) * b * d + a * d + c * b, b * d),
     solution: ({ w1, a, b, w2, c, d }) =>
@@ -475,15 +493,15 @@ export const UNIT_08: QuestionTemplate[] = [
     format: CHOICE,
     params(rng) {
       const [a, b, c, d] = pick(rng, BETWEEN);
-      return { a, b, c, d };
+      return { a, b, c, d, r: int(rng, 0, 3), ...perm(rng, 11) };
     },
     prompt: ({ a, b, c, d }, zone) =>
       `A marker ${Z[zone].place} must be placed at a point strictly between ${a}/${b} and ${c}/${d} of the way along a trail. Which fraction is a possible place for the marker?`,
-    options: ({ a, b, c, d }) => withDistractors(fmt(a + c, b + d), [`${a}/${b + 1}`, fmt(2 * c + 1, 2 * d), `${2 * c}/${2 * d}`, fmt(a + 1, b)]),
+    options: (p) => ranked(p, [p.a + p.c, p.b + p.d], [[p.a, p.b + 1], [p.a, p.b + 2], [p.a, 2 * p.b], [1, p.b + p.d], [p.c, p.d], [2 * p.c + 1, 2 * p.d], [p.c + 1, p.d], [p.c, p.d - 1], [3 * p.c + 1, 3 * p.d], [2 * p.a, 2 * p.b + 1], [3 * p.a, 3 * p.b + 2]]),
     expected: ({ a, b, c, d }) => fmt(a + c, b + d),
     solution: ({ a, b, c, d }) =>
       `Turn them into decimals: ${a}/${b} ≈ ${(a / b).toFixed(2)} and ${c}/${d} ≈ ${(c / d).toFixed(2)}. A fraction between them must be bigger than ${(a / b).toFixed(2)} and smaller than ${(c / d).toFixed(2)}. ` +
-      `${fmt(a + c, b + d)} ≈ ${((a + c) / (b + d)).toFixed(2)} fits. (${a}/${b + 1} is too small, ${fmt(2 * c + 1, 2 * d)} is too big, and ${2 * c}/${2 * d} equals ${c}/${d}.) ` +
+      `${fmt(a + c, b + d)} ≈ ${((a + c) / (b + d)).toFixed(2)} fits. Every other option is too small, too big, or equal to ${c}/${d}. ` +
       `The answer is ${fmt(a + c, b + d)}.`,
   },
   {
@@ -495,7 +513,7 @@ export const UNIT_08: QuestionTemplate[] = [
     params(rng) {
       const b = int(rng, 2, 5);
       const d = int(rng, 2, 5);
-      return { w1: int(rng, 1, 3), a: numer(rng, b), b, w2: int(rng, 1, 3), c: numer(rng, d), d, ...perm(rng, 4) };
+      return { w1: int(rng, 1, 3), a: numer(rng, b), b, w2: int(rng, 1, 3), c: numer(rng, d), d, r: int(rng, 0, 3), ...perm(rng, 8) };
     },
     prompt: ({ w1, a, b, w2, c, d }, zone) =>
       `A mat ${Z[zone].place} is ${w1} ${a}/${b} m long and ${w2} ${c}/${d} m wide. What area, in square metres, does it cover? ${SIMPLEST}`,
@@ -503,7 +521,16 @@ export const UNIT_08: QuestionTemplate[] = [
       const { w1, a, b, w2, c, d } = p;
       const top = (w1 * b + a) * (w2 * d + c);
       const den = b * d;
-      return withDistractors(fmt(top, den), shuffledCands(p, [`${w1 * w2} ${fmt(a * c, den)}`, fmt(top + den, den), fmt(top - den, den), fmt(top + 1, den)]));
+      return ranked(p, [top, den], [
+        [w1 * w2 * den + a * c, den], // multiplied wholes and fractions separately
+        [(w1 + w2) * den + a * d + c * b, den], // added instead of multiplied
+        [top, b + d],
+        [top + 1, den],
+        [top - 1, den],
+        [top, 2 * den],
+        [top, den + 1],
+        [top, den - 1],
+      ]);
     },
     expected: ({ w1, a, b, w2, c, d }) => fmt((w1 * b + a) * (w2 * d + c), b * d),
     solution: ({ w1, a, b, w2, c, d }) =>
