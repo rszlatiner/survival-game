@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_07 } from "@/content/units/unit-07";
-import { bankChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { rankChecks } from "./helpers/rank";
 
 bankChecks(7, UNIT_07);
+overlapChecks(UNIT_07);
+coordinateChecks(UNIT_07);
+rankChecks(UNIT_07);
 
 const get = (id: string) => UNIT_07.find((t) => t.id === id)!;
 /** Exact hundredths: work in integers (pi = 314 hundredths) to avoid float noise. */
@@ -72,21 +76,10 @@ describe("unit 7 independent recompute", () => {
       expect(a).toBeLessThan(l);
       expect(b).toBeLessThan(w);
     }));
-  it("area-convert-01", () =>
-    run("u07-area-convert-01", (p, e) => {
-      const [l, w] = numsIn(p);
-      expect(e).toBe((l / 100) * (w / 100));
-    }));
   it("triangle-height-01", () =>
     run("u07-triangle-height-01", (p, e) => {
       const [b, area] = numsIn(p);
       expect((b * Number(e)) / 2).toBe(area);
-    }));
-  it("l-perimeter-01: walk the outline of the L shape", () =>
-    run("u07-l-perimeter-01", (p, e) => {
-      const [l, w, a, b] = numsIn(p);
-      // L outline edges: l, w - b, a, b, l - a, w
-      expect(l + (w - b) + a + b + (l - a) + w).toBe(e);
     }));
   it("compare-shapes-01: the named rack has the strictly greatest area", () =>
     run("u07-compare-shapes-01", (p, e) => {
@@ -118,15 +111,30 @@ describe("unit 7 independent recompute", () => {
       expect(floorCm2 % (t * t)).toBe(0);
       expect(e).toBe(floorCm2 / (t * t));
     }));
-  it("scale-claim-01: only k squared matches the area ratio", () =>
-    run("u07-scale-claim-01", (p, e, opts) => {
-      const [r, k] = numsIn(p);
-      const ratio = (k * r) ** 2 / r ** 2;
-      expect(opts!.filter((o) => numsIn(o)[0] === ratio)).toEqual([e]);
-    }));
   it("mixed-units-01", () =>
     run("u07-mixed-units-01", (p, e) => {
       const [l, c] = numsIn(p);
       expect(close(Number(e), l * (c / 100))).toBe(true);
+    }));
+  it("area-units-01", () =>
+    run("u07-area-units-01", (p, e) => {
+      const a = numsIn(p)[0];
+      // 1 m by 1 m is 100 cm by 100 cm.
+      if (/in cm²/.test(p)) expect(e).toBe(a * 100 * 100);
+      else expect(e * 100 * 100).toBe(a);
+    }));
+  it("window-01: rectangle plus half a circle of the stated diameter", () =>
+    run("u07-window-01", (p, e) => {
+      const [wide, h] = numsIn(p.replace("3.14", ""));
+      const r = wide / 2;
+      expect(close(Number(e), wide * h + piTimes(r * r) / 2)).toBe(true);
+    }));
+  it("scale-claim-01: only the true area or radius factor matches, and the key is not always in the same place", () =>
+    run("u07-scale-claim-01", (p, e, opts, where) => {
+      const [r, n] = numsIn(p);
+      const factor = /radius \d+ times as long/.test(p) ? n * n : Math.sqrt(n);
+      void r;
+      expect(opts!.filter((o) => numsIn(o)[0] === factor), where).toEqual([e]);
+      expect(opts).toHaveLength(4);
     }));
 });
