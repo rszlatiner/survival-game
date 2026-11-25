@@ -25,6 +25,20 @@ const hours = (n: number) => (n === 1 ? "1 hour" : `${n} hours`);
 /** Equation text for y = mx + c, written in one of two orders. */
 const line = (m: number, c: number, flip: number) => (flip ? `y = ${c} + ${m}x` : `y = ${m}x + ${c}`);
 
+/** The 10 ways to keep three of five slips, so different seeds show different wrong options. */
+const KEEP3: number[][] = [];
+for (let i = 0; i < 5; i++) for (let j = i + 1; j < 5; j++) for (let k = j + 1; k < 5; k++) KEEP3.push([i, j, k]);
+const pick3 = <T,>(pool: T[], sel: number): T[] => KEEP3[sel].map((i) => pool[i]);
+
+/** Five slips for the fourth corner of a rectangle with corners (x1,y1), (x2,y1), (x2,y2). */
+const cornerPool = (x1: number, x2: number, y1: number, y2: number) => [
+  pt(x2, y1 + y2),
+  pt(x1, y1),
+  pt(x1 + x2, y1),
+  pt(y2 - y1, x1),
+  pt(x2 - x1, y1),
+];
+
 export const UNIT_10: QuestionTemplate[] = [
   // ---------------- Difficulty 1 ----------------
   {
@@ -170,14 +184,15 @@ export const UNIT_10: QuestionTemplate[] = [
       const mx = int(rng, 4, 9);
       let my = int(rng, 4, 9);
       if (my === mx) my = my === 9 ? 4 : my + 1;
-      return { mx, my, h: int(rng, 1, mx - 1), k: int(rng, 1, my - 1), drop: int(rng, 0, 3) };
+      return { mx, my, h: int(rng, 1, mx - 1), k: int(rng, 1, my - 1), sel: int(rng, 0, 9) };
     },
     prompt: ({ mx, my, h, k }, zone) =>
       `${Z[zone].Place}, two lookout posts are at ${pt(mx - h, my - k)} and ${pt(mx + h, my + k)} on your grid map. ` +
       `A signal fire is placed exactly halfway between them. What are its coordinates?`,
-    options: ({ mx, my, h, k, drop }) => [
+    // Five slips: not halved, coordinates swapped, half the gap, one coordinate not halved, y of the upper post.
+    options: ({ mx, my, h, k, sel }) => [
       pt(mx, my),
-      ...[pt(2 * mx, 2 * my), pt(my, mx), pt(h, k), pt(mx, 2 * my)].filter((_, i) => i !== drop),
+      ...pick3([pt(2 * mx, 2 * my), pt(my, mx), pt(h, k), pt(mx, 2 * my), pt(mx, my + k)], sel),
     ],
     expected: ({ mx, my }) => pt(mx, my),
     solution: ({ mx, my, h, k }) =>
@@ -190,12 +205,13 @@ export const UNIT_10: QuestionTemplate[] = [
     difficulty: 2,
     resource: "food",
     format: CHOICE,
-    params: (rng) => ({ m: int(rng, 3, 6), c: int(rng, 1, 5), k: int(rng, 2, 9), drop: int(rng, 0, 3) }),
+    params: (rng) => ({ m: int(rng, 3, 6), c: int(rng, 1, 5), k: int(rng, 3, 9), sel: int(rng, 0, 9) }),
     prompt: ({ m, c }, zone) =>
       `${Z[zone].Place}, a path follows the line y = ${m}x + ${c} on your map. Which of these points is on the path?`,
-    options: ({ m, c, k, drop }) => [
+    // Five slips with different x-values: the right y at a neighbouring x, the coordinates swapped, y for the wrong x.
+    options: ({ m, c, k, sel }) => [
       pt(k, m * k + c),
-      ...[pt(k, m * k - c), pt(m * k + c, k), pt(k, m * (k + 1) + c), pt(k, m * k)].filter((_, i) => i !== drop),
+      ...pick3([pt(k + 1, m * k + c), pt(k - 1, m * k + c), pt(m * k + c, k), pt(k + 2, m * k), pt(k - 2, m * k + 2 * c)], sel),
     ],
     expected: ({ m, c, k }) => pt(k, m * k + c),
     solution: ({ m, c, k }) =>
@@ -251,22 +267,20 @@ export const UNIT_10: QuestionTemplate[] = [
     resource: "wood",
     format: CHOICE,
     params: (rng) => {
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 100; i++) {
         const x1 = int(rng, 1, 5);
         const x2 = x1 + int(rng, 3, 6);
         const y1 = int(rng, 1, 5);
         const y2 = y1 + int(rng, 3, 6);
-        if (y2 !== x1 && x2 !== 2 * x1) return { x1, x2, y1, y2, drop: int(rng, 0, 3) };
+        const all = [pt(x1, y2), ...cornerPool(x1, x2, y1, y2)];
+        if (new Set(all).size === all.length) return { x1, x2, y1, y2, sel: int(rng, 0, 9) };
       }
-      return { x1: 1, x2: 5, y1: 2, y2: 7, drop: 0 };
+      return { x1: 1, x2: 5, y1: 2, y2: 7, sel: 0 };
     },
     prompt: ({ x1, x2, y1, y2 }, zone) =>
       `${Z[zone].Place}, three corners of a rectangular plot are at ${pt(x1, y1)}, ${pt(x2, y1)} and ${pt(x2, y2)}. ` +
       `Its sides are parallel to the axes. What are the coordinates of the fourth corner?`,
-    options: ({ x1, x2, y1, y2, drop }) => [
-      pt(x1, y2),
-      ...[pt(y2, x1), pt(x1, y2 - y1), pt(x2 - x1, y2), pt(x1 + x2, y2)].filter((_, i) => i !== drop),
-    ],
+    options: ({ x1, x2, y1, y2, sel }) => [pt(x1, y2), ...pick3(cornerPool(x1, x2, y1, y2), sel)],
     expected: ({ x1, y2 }) => pt(x1, y2),
     solution: ({ x1, x2, y1, y2 }) =>
       `The corners at ${pt(x1, y1)} and ${pt(x2, y1)} share y = ${y1}, and the corner at ${pt(x2, y2)} is directly above the second one. ` +
@@ -314,28 +328,24 @@ export const UNIT_10: QuestionTemplate[] = [
     resource: "wood",
     format: CHOICE,
     params: (rng) => {
-      const m = int(rng, 2, 5);
-      const c = int(rng, 1, 8);
-      const p = int(rng, 2, 7);
-      const right = int(rng, 0, 1);
+      const right = int(rng, 0, 3) === 0 ? 1 : 0;
       const off = int(rng, 1, 3) * (int(rng, 0, 1) ? 1 : -1);
-      return { m, c, p, right, off, sw: int(rng, 0, 1), ia: int(rng, 0, 1), ib: int(rng, 0, 1) };
+      return { m: int(rng, 2, 5), c: int(rng, 1, 8), p: int(rng, 2, 7), right, off, rot: int(rng, 0, 3) };
     },
     prompt: ({ m, c, p, right, off }, zone) =>
       `${Z[zone].Place}, Sam says the point (${p}, ${m * p + c + (right ? 0 : off)}) is on the line y = ${m}x + ${c}. ` +
       `Which statement is correct?`,
-    options: ({ m, c, p, right, sw, ia, ib }) => {
+    // Every option is self-consistent: it says "Yes" only when the y it states is Sam's y.
+    options: ({ m, c, p, right, off, rot }) => {
       const A = m * p + c;
-      const v = right ? "Yes" : "No";
-      const o = right ? "No" : "Yes";
-      const above = [A + m, A + c][ia];
-      const below = [A - m, A - c][ib];
-      return [
-        `${v}, y = ${A} when x = ${p}`,
-        `${o}, y = ${A} when x = ${p}`,
-        `${v}, y = ${sw ? below : above} when x = ${p}`,
-        `${o}, y = ${sw ? above : below} when x = ${p}`,
-      ];
+      const q = A + (right ? 0 : off);
+      const slips = [A + m, A - m, A + c, A - c, A + 1, A - 1, A + 2].filter((v, i, arr) => arr.indexOf(v) === i && v !== A);
+      const wrong: number[] = right ? [] : [q];
+      for (let i = 0; wrong.length < 3 && i < slips.length; i++) {
+        const v = slips[(i + rot) % slips.length];
+        if (!wrong.includes(v)) wrong.push(v);
+      }
+      return [A, ...wrong].map((v) => `${v === q ? "Yes" : "No"}, y = ${v} when x = ${p}`);
     },
     expected: ({ m, c, p, right }) => `${right ? "Yes" : "No"}, y = ${m * p + c} when x = ${p}`,
     solution: ({ m, c, p, right, off }) =>

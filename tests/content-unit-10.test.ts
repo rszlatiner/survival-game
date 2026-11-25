@@ -180,6 +180,46 @@ describe("unit 10 independent recompute", () => {
     }));
 });
 
+describe("unit 10 coordinate options do not give the key away", () => {
+  /** How often the option whose numbers appear most in the other options (unique best) is the key. */
+  const centreRate = (id: string) => {
+    let hit = 0;
+    let n = 0;
+    eachQuestion(get(id), ({ publicQ, expected }) => {
+      const opts = publicQ.options!;
+      const nums = opts.map((o) => numsIn(o));
+      const score = nums.map((a, i) => a.reduce((acc, v, k) => acc + nums.filter((b, j) => j !== i && b[k] === v).length, 0));
+      const best = Math.max(...score);
+      n++;
+      if (score.filter((v) => v === best).length === 1 && opts[score.indexOf(best)] === expected) hit++;
+    });
+    return hit / n;
+  };
+  for (const id of ["u10-rectangle-02", "u10-on-line-02", "u10-midpoint-02"])
+    it(`${id}: the option sharing most coordinates with the rest is the key on under half of seeds`, () => {
+      expect(centreRate(id)).toBeLessThan(0.5);
+    });
+  it("on-line-02: wrong options have different x-values, and the swapped point is not always shown", () => {
+    let swapShown = 0;
+    let n = 0;
+    eachQuestion(get("u10-on-line-02"), ({ publicQ, expected }) => {
+      const key = pairs(expected as string)[0];
+      const others = publicQ.options!.filter((o) => o !== expected).map((o) => pairs(o)[0]);
+      n++;
+      if (others.some(([x, y]) => x === key[1] && y === key[0])) swapShown++;
+      expect(new Set(others.map((o) => o[0])).size).toBeGreaterThanOrEqual(2);
+    });
+    expect(swapShown / n).toBeLessThan(0.8);
+    expect(swapShown / n).toBeGreaterThan(0.3);
+  });
+  it("claim-03: every option is self-consistent with Sam's stated point", () => {
+    eachQuestion(get("u10-claim-03"), ({ publicQ }, where) => {
+      const q = numsIn(publicQ.prompt)[1];
+      for (const o of publicQ.options!) expect(o.startsWith(numsIn(o)[0] === q ? "Yes" : "No"), `${where} ${o}`).toBe(true);
+    });
+  });
+});
+
 describe("unit 10 prompts read well in every zone", () => {
   it("no doubled nouns, bad articles or stray 1-plurals", () => {
     for (const t of UNIT_10)
