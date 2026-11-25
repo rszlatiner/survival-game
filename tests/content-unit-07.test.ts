@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_07 } from "@/content/units/unit-07";
 import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
-import { rankChecks } from "./helpers/rank";
+import { rankChecks, valueRankChecks } from "./helpers/rank";
 
 bankChecks(7, UNIT_07);
 overlapChecks(UNIT_07);
 coordinateChecks(UNIT_07);
 rankChecks(UNIT_07);
+valueRankChecks(UNIT_07);
 
 const get = (id: string) => UNIT_07.find((t) => t.id === id)!;
 /** Exact hundredths: work in integers (pi = 314 hundredths) to avoid float noise. */
