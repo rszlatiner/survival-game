@@ -14,7 +14,9 @@ export type Params = Record<string, number>;
  * A parameterised question. `params` draws the numbers from a seeded rng;
  * every other function is pure in those numbers (and the zone, for wording).
  * For `choice` templates, `options(p)` lists the option strings and
- * `expected(p)` returns the exact correct option string.
+ * `expected(p)` returns the exact correct option string. For `expression`
+ * templates `expected(p)` returns the answer as an expression string in the
+ * student syntax (e.g. "3x+6"); any equivalent form a student types is accepted.
  */
 export interface QuestionTemplate {
   id: string;

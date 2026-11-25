@@ -3,6 +3,7 @@ import { ROUNDS } from "@/lib/config";
 import { toPublicState } from "@/lib/engine/public";
 import { revealRound, startRound } from "@/lib/engine/round";
 import type { GameState } from "@/lib/types";
+import { EXPR_TEMPLATE, withExpressionQuestions } from "./helpers/expression";
 import { captainOf, questionGame, startedGame, submitAnswer } from "./helpers/game";
 
 /** Every string value and every key name anywhere in `v`. */
@@ -71,6 +72,24 @@ describe("toPublicState", () => {
       }
     }
     expect(sawChoice && sawOther).toBe(true);
+  });
+
+  it("expression questions expose only the kind before reveal, never the expected expression", () => {
+    let g = withExpressionQuestions(questionGame(3));
+    const [a] = g.teams;
+    g = submitAnswer(g, a.id, captainOf(a), "3x+6", g.round!.startedAt + 1);
+    const pub = assertNoLeak(g);
+    for (const t of g.teams) {
+      expect(g.round!.questions[t.id].expected).toBe("3x+6");
+      expect(pub.round!.questions[t.id].format).toStrictEqual({ kind: "expression" });
+      expect(Object.keys(pub.round!.questions[t.id]).sort()).toEqual(
+        ["difficulty", "format", "prompt", "resource", "templateId", "unit"],
+      );
+      expect(pub.round!.questions[t.id].templateId).toBe(EXPR_TEMPLATE.id);
+    }
+    // The captain's own typed answer is not echoed back before reveal either.
+    expect(JSON.stringify(pub)).not.toContain("3x+6");
+    expect(pub.round!.results).toBeNull();
   });
 
   it("treats the tiebreak phase like a question phase", () => {
