@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { MIN_SECRET_LENGTH } from "@/lib/auth";
+import { ABANDONED_GAME_MAX_AGE_MS, FINISHED_GAME_MAX_AGE_MS } from "@/lib/config";
 import type { GameRepo } from "@/lib/repo/types";
 import { ApiError } from "./errors";
 
@@ -9,8 +10,6 @@ export interface CronEnv {
   cronSecret: string | undefined;
 }
 
-/** Games older than this are deleted by the cleanup job. */
-export const GAME_MAX_AGE_MS = 24 * 3600 * 1000;
 
 const sha256 = (s: string) => createHash("sha256").update(s, "utf8").digest();
 
@@ -42,12 +41,12 @@ export async function keepaliveHandler(
   return { ok: true };
 }
 
-/** Deletes games created more than 24 hours before `now`. */
+/** Deletes finished games after 24 hours and never-finished games after 90 days; running games are kept. */
 export async function cleanupHandler(
   repo: GameRepo,
   env: CronEnv,
   authHeader: string | null,
 ): Promise<{ deleted: number }> {
   authorize(env, authHeader);
-  return { deleted: await repo.deleteOlderThan(GAME_MAX_AGE_MS) };
+  return { deleted: await repo.deleteStale(FINISHED_GAME_MAX_AGE_MS, ABANDONED_GAME_MAX_AGE_MS) };
 }

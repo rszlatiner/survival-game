@@ -93,19 +93,23 @@ describe.each(factories)("%s", (_name, make) => {
     expect(await repo.activeCodes()).toEqual(new Set(["AAA222", "BBB333"]));
   });
 
-  it("deleteOlderThan removes only games created before now - ms", async () => {
+  it("deleteStale removes finished games after finishedMs and running games only after abandonedMs", async () => {
     const { repo, setNow } = make();
-    await repo.create(game("OLD222", T0 - 1));
-    await repo.create(game("EDG333", T0)); // exactly at the cutoff: kept
-    await repo.create(game("NEW444", T0 + 1000));
+    const fin = (code: string, createdAt: number) => ({ ...game(code, createdAt), phase: "finished" as const });
+    await repo.create(fin("FIN222", T0 - 1));
+    await repo.create(fin("FIN333", T0)); // exactly at the cutoff: kept
+    await repo.create(game("RUN444", T0 - 1)); // running: kept long after a finished game would go
     setNow(T0 + DAY);
-    expect(await repo.deleteOlderThan(DAY)).toBe(1);
-    expect(await repo.activeCodes()).toEqual(new Set(["EDG333", "NEW444"]));
-    expect(await repo.get("OLD222")).toBeNull();
-    expect(await repo.deleteOlderThan(DAY)).toBe(0);
+    expect(await repo.deleteStale(DAY, 90 * DAY)).toBe(1);
+    expect(await repo.activeCodes()).toEqual(new Set(["FIN333", "RUN444"]));
+    expect(await repo.get("FIN222")).toBeNull();
+    expect(await repo.deleteStale(DAY, 90 * DAY)).toBe(0);
     setNow(T0 + DAY + 1);
-    expect(await repo.deleteOlderThan(DAY)).toBe(1);
-    expect(await repo.activeCodes()).toEqual(new Set(["NEW444"]));
+    expect(await repo.deleteStale(DAY, 90 * DAY)).toBe(1);
+    expect(await repo.activeCodes()).toEqual(new Set(["RUN444"]));
+    setNow(T0 + 91 * DAY);
+    expect(await repo.deleteStale(DAY, 90 * DAY)).toBe(1);
+    expect(await repo.activeCodes()).toEqual(new Set());
   });
 
   it("pings", async () => {

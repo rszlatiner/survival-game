@@ -69,7 +69,7 @@ Notes:
 
 4. Press Deploy. The first build takes a minute or two. Vercel gives you an address like `https://survival-game-xxxx.vercel.app`. Note it; this document calls it `<URL>`.
 
-Two scheduled jobs run daily on Vercel (declared in `vercel.json`): `/api/cron/keepalive` touches the database so Supabase does not pause it, and `/api/cron/cleanup` deletes games older than 24 hours. Vercel sends `CRON_SECRET` as a Bearer token automatically when the variable is set.
+Two scheduled jobs run daily on Vercel (declared in `vercel.json`): `/api/cron/keepalive` touches the database so Supabase does not pause it, and `/api/cron/cleanup` deletes finished games after 24 hours (a game that is still running is never deleted; one nobody finished is removed after 90 days). Vercel sends `CRON_SECRET` as a Bearer token automatically when the variable is set.
 
 ### 5. Check the live site
 
@@ -109,7 +109,7 @@ export NEXT_PUBLIC_SUPABASE_ANON_KEY='<anon key>'
 npm run loadcheck -- <URL> <CODE>
 ```
 
-   The arguments are `<URL> <CODE> [clients=30] [samples=5] [pollMs=2000]`, so the command above uses 30 simulated clients. The two `NEXT_PUBLIC_` lines are optional and make the simulated clients also listen on the Broadcast channel, like real browsers (the output says "with Broadcast"). Use `LOADCHECK_HOST_TOKEN` instead of the password if you prefer. The script sends five harmless "extend timer by 1 second" actions and reports how long it takes all 30 clients to see each change. It must print `PASS (p95 <= 3000 ms)`. If it prints FAIL, do not use the game in class until you find out why. Delete or ignore the throwaway game afterwards; games are removed automatically after 24 hours.
+   The arguments are `<URL> <CODE> [clients=30] [samples=5] [pollMs=2000]`, so the command above uses 30 simulated clients. The two `NEXT_PUBLIC_` lines are optional and make the simulated clients also listen on the Broadcast channel, like real browsers (the output says "with Broadcast"). Use `LOADCHECK_HOST_TOKEN` instead of the password if you prefer. The script sends five harmless "extend timer by 1 second" actions and reports how long it takes all 30 clients to see each change. It must print `PASS (p95 <= 3000 ms)`. If it prints FAIL, do not use the game in class until you find out why. Delete or ignore the throwaway game afterwards; finished games are removed automatically after 24 hours.
 
 ---
 
@@ -142,7 +142,7 @@ If the top teams are level on Survival Points and on total stock (or two teams c
 
 ### Lost your host login
 
-If you close the tab, refresh, or use another laptop, open `<URL>/host/<CODE>`. If the browser is not signed in as host it shows a Sign in again form: enter the teacher password and you take control again. The game state is stored on the server, so nothing is lost. A host sign-in lasts 24 hours. The New game page lists games this browser is still signed in to under "Resume your game". Always open the game from the same web address (the stored login belongs to that address).
+If you close the tab, refresh, or use another laptop, open `<URL>/host/<CODE>`. If the browser is not signed in as host it shows a Sign in again form: enter the teacher password and you take control again. The game state is stored on the server, so nothing is lost. A host sign-in never times out while the game is running; it only ends when the game is deleted. The New game page lists games this browser is still signed in to under "Resume your game". Always open the game from the same web address (the stored login belongs to that address).
 
 ### Quick versus standard
 

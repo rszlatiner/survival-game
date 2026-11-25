@@ -4,6 +4,8 @@
  * in-memory Map keeps the session alive for the life of the page.
  */
 
+import { SESSION_LIFETIME_MS } from "@/lib/config";
+
 export interface Session {
   token: string;
   role: "host" | "team";
@@ -18,7 +20,7 @@ export interface Session {
 }
 
 /** Server token lifetime (lib/api/handlers TOKEN_TTL_MS); the stored expiry is derived from it. */
-export const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+export const SESSION_TTL_MS = SESSION_LIFETIME_MS;
 
 export interface StoredHostSession {
   code: string;

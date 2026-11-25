@@ -26,11 +26,12 @@ export function memoryRepo(now: () => number = Date.now): GameRepo {
     async activeCodes() {
       return new Set(games.keys());
     },
-    async deleteOlderThan(ms) {
-      const cutoff = now() - ms;
+    async deleteStale(finishedMs, abandonedMs) {
+      const t = now();
       let n = 0;
       for (const [code, g] of games) {
-        if (g.createdAt < cutoff) {
+        const stale = g.phase === "finished" ? g.createdAt < t - finishedMs : g.createdAt < t - abandonedMs;
+        if (stale) {
           games.delete(code);
           n++;
         }

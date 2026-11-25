@@ -50,3 +50,10 @@ export const MAX_ANSWER_LENGTH = 40;
 export const MAX_OVERRIDE = 9999;
 export const TIMER_MIN_SECONDS = 10;
 export const TIMER_MAX_SECONDS = 600;
+
+/** Sessions never time out while a game runs (about 10 years, effectively forever). The game ending or being deleted is what kills a session. */
+export const SESSION_LIFETIME_MS = 10 * 365 * 24 * 60 * 60 * 1000;
+/** Finished games are removed after this long. */
+export const FINISHED_GAME_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** A game nobody ever finished is only removed after this long (storage hygiene). */
+export const ABANDONED_GAME_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;

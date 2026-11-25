@@ -438,8 +438,8 @@ describe("listSessions", () => {
   beforeEach(clearAll);
   afterEach(clearAll);
 
-  it("saveSession stamps createdAt and an expiry 24 hours ahead", () => {
-    expect(SESSION_TTL_MS).toBe(24 * 60 * 60 * 1000);
+  it("saveSession stamps createdAt and a practically endless expiry", () => {
+    expect(SESSION_TTL_MS).toBeGreaterThanOrEqual(5 * 365 * 24 * 60 * 60 * 1000);
     const t = Date.now();
     saveSession("ABCDEF", { token: "t", role: "host", deviceId: "d" });
     const s = loadSession("ABCDEF")!;

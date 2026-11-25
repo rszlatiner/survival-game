@@ -33,7 +33,10 @@ export function fakeSupabase() {
       if (op === "select") this.returning = true;
     }
     eq(col: string, v: unknown) {
-      this.filters.push((r) => r[col] === v);
+      // PostgREST JSON path text filter, e.g. "state->>phase".
+      const m = /^(\w+)->>(\w+)$/.exec(col);
+      if (m) this.filters.push((r) => String((r[m[1]] as Row | undefined)?.[m[2]]) === String(v));
+      else this.filters.push((r) => r[col] === v);
       return this;
     }
     lt(col: string, v: string) {

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { SESSION_LIFETIME_MS } from "@/lib/config";
 import { MIN_SECRET_LENGTH, checkPassword, signToken, verifyToken, type VerifiedToken } from "@/lib/auth";
 import { buildItem, exchange } from "@/lib/engine/build";
 import {
@@ -65,8 +66,8 @@ export function retryDelay(rand: number): number {
   return RETRY_MIN_MS + Math.min(span - 1, Math.max(0, Math.floor(rand * span)));
 }
 
-/** Token lifetime: 24 hours, the maximum the project allows (games themselves are deleted after 24 hours). */
-export const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+/** Token lifetime: effectively forever. A running game never makes anyone sign in again; only ending or deleting the game does. */
+export const TOKEN_TTL_MS = SESSION_LIFETIME_MS;
 const CREATE_ATTEMPTS = 5;
 
 const unauthorized = () => new ApiError(401, "UNAUTHORIZED");

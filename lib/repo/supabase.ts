@@ -83,12 +83,17 @@ export function supabaseRepo(
       return new Set((rows ?? []).map((r) => r.code));
     },
 
-    async deleteOlderThan(ms) {
-      const cutoff = new Date(now() - ms).toISOString();
-      const rows = check(await db.from("games").delete().lt("created_at", cutoff).select("code"), "delete games") as
-        | { code: string }[]
-        | null;
-      return (rows ?? []).length;
+    async deleteStale(finishedMs, abandonedMs) {
+      const t = now();
+      const finished = check(
+        await db.from("games").delete().lt("created_at", new Date(t - finishedMs).toISOString()).eq("state->>phase", "finished").select("code"),
+        "delete finished games",
+      ) as { code: string }[] | null;
+      const abandoned = check(
+        await db.from("games").delete().lt("created_at", new Date(t - abandonedMs).toISOString()).select("code"),
+        "delete abandoned games",
+      ) as { code: string }[] | null;
+      return (finished ?? []).length + (abandoned ?? []).length;
     },
 
     async ping() {

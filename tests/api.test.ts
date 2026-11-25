@@ -578,13 +578,13 @@ describe("host login", () => {
     expect(ok.phase).toBe("finished");
   });
 
-  it("token lifetime is 24 hours (the maximum allowed) and host login tokens last that long", async () => {
-    expect(TOKEN_TTL_MS).toBe(24 * 60 * 60 * 1000);
+  it("tokens effectively never expire while a game runs (years, not hours)", async () => {
+    expect(TOKEN_TTL_MS).toBeGreaterThanOrEqual(5 * 365 * 24 * 60 * 60 * 1000);
     const repo = memoryRepo();
     const { env } = makeEnv();
     const { code } = await newGame(repo, env);
     const { hostToken } = await hostLoginHandler(repo, env, code, PASSWORD, T0);
-    expect(verifyToken(hostToken, env.tokenSecret, T0 + 23 * 3600 * 1000)).not.toBeNull();
+    expect(verifyToken(hostToken, env.tokenSecret, T0 + 30 * 24 * 3600 * 1000)).not.toBeNull();
     expect(verifyToken(hostToken, env.tokenSecret, T0 + TOKEN_TTL_MS + 1)).toBeNull();
   });
 

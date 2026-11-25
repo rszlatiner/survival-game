@@ -16,8 +16,11 @@ export interface GameRepo {
   get(code: string): Promise<GameState | null>;
   save(g: GameState, expectedVersion: number): Promise<void>;
   activeCodes(): Promise<Set<string>>;
-  /** Deletes games with createdAt < now - ms; returns how many were deleted. */
-  deleteOlderThan(ms: number): Promise<number>;
+  /**
+   * Deletes finished games created more than `finishedMs` ago and any game created more than
+   * `abandonedMs` ago; a running game younger than `abandonedMs` is never touched. Returns how many.
+   */
+  deleteStale(finishedMs: number, abandonedMs: number): Promise<number>;
   ping(): Promise<void>;
 }
 

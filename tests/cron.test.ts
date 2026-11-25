@@ -58,16 +58,17 @@ describe("keepalive", () => {
 });
 
 describe("cleanup", () => {
-  it("deletes only games older than 24 hours", async () => {
+  it("deletes finished games after 24 hours, keeps running games until 90 days", async () => {
     const repo = spyRepo();
-    await repo.create(at("OLD1", NOW - 24 * HOUR - 1));
-    await repo.create(at("OLD2", NOW - 48 * HOUR));
-    await repo.create(at("EDGE", NOW - 24 * HOUR));
-    await repo.create(at("NEW1", NOW - 23 * HOUR));
-    await repo.create(at("NEW2", NOW));
+    const done = (code: string, createdAt: number): GameState => ({ ...at(code, createdAt), phase: "finished" });
+    await repo.create(done("OLD1", NOW - 24 * HOUR - 1));
+    await repo.create(done("EDGE", NOW - 24 * HOUR));
+    await repo.create(done("NEW1", NOW - 23 * HOUR));
+    await repo.create({ ...at("LIVE", NOW - 48 * HOUR), phase: "question" }); // running two days: must survive
+    await repo.create({ ...at("LOST", NOW - 91 * 24 * HOUR), phase: "lobby" }); // abandoned for 91 days
     const out = await cleanupHandler(repo, { cronSecret: SECRET }, `Bearer ${SECRET}`);
     expect(out).toEqual({ deleted: 2 });
-    expect([...(await repo.activeCodes())].sort()).toEqual(["EDGE", "NEW1", "NEW2"]);
+    expect([...(await repo.activeCodes())].sort()).toEqual(["EDGE", "LIVE", "NEW1"]);
   });
 });
 
