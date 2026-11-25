@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_03 } from "@/content/units/unit-03";
-import { bankChecks, overlapChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
 
 bankChecks(3, UNIT_03);
 overlapChecks(UNIT_03);
+coordinateChecks(UNIT_03);
 
 const get = (id: string) => UNIT_03.find((t) => t.id === id)!;
 /** Round half up at a decimal place using exact whole-number arithmetic on a decimal string. */

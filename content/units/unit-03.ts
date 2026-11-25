@@ -252,7 +252,7 @@ export const UNIT_03: QuestionTemplate[] = [
           const n = [20, 25, 50][int(rng, 0, 2)];
           const m = [20, 25, 50][int(rng, 0, 2)];
           const a = int(rng, 2, n - 2);
-          if ((a * m) % n === 0 && (a * m) / n >= 2 && (a * m) / n <= m - 2) return { n, m, a, b: (a * m) / n };
+          if (n !== m && (a * m) % n === 0 && (a * m) / n >= 2 && (a * m) / n <= m - 2) return { n, m, a, b: (a * m) / n };
         }
       }
       for (let i = 0; i < 100; i++) {
@@ -410,7 +410,7 @@ export const UNIT_03: QuestionTemplate[] = [
       const best = all.reduce((m, x) => (x[0] > m[0] ? x : m));
       return (
         `Change every share to a percentage: ${all.map(([v, f]) => (f === 0 ? `${v}%` : `${shareText(v, f)} = ${v}%`)).join(", ")}. ` +
-        `The greatest is ${best[0]}%, which is ${shareText(best[0], best[1])}.`
+        `The greatest is ${best[0]}%${best[1] === 0 ? "" : `, which is ${shareText(best[0], best[1])}`}.`
       );
     },
   },
