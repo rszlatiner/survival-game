@@ -196,7 +196,7 @@ export const UNIT_02: QuestionTemplate[] = [
     options: ({ a, b, c, d }) => [
       `${a + c}x + ${a * b + c * d}`,
       `${a + c}x + ${b + d}`,
-      `${a + c}x + ${a * b + d}`,
+      `${a * c}x + ${a * b + c * d}`,
       `${a * c}x + ${b + d}`,
     ],
     expected: ({ a, b, c, d }) => `${a + c}x + ${a * b + c * d}`,
@@ -297,7 +297,7 @@ export const UNIT_02: QuestionTemplate[] = [
       return { a: 3, b: 3, c: 2, d: 2, e: 2 };
     },
     prompt: ({ a, b, c, d, e }, zone) =>
-      `${Z[zone].Place}, the daily ${Z[zone].water} budget is ${a}(${b}x + ${c}) ${MINUS} ${d}(x ${MINUS} ${e}) litres, where x is the number of days. ` +
+      `${Z[zone].Place}, the ${Z[zone].water} needed for x days is ${a}(${b}x + ${c}) ${MINUS} ${d}(x ${MINUS} ${e}) litres. ` +
       `When it is expanded and simplified, what is the coefficient of x (the number in front of x)?`,
     expected: ({ a, b, d }) => a * b - d,
     solution: ({ a, b, c, d, e }) =>
@@ -396,8 +396,8 @@ export const UNIT_02: QuestionTemplate[] = [
     options: ({ a, b, c, d }) => [
       lin(a - c, a * b + c * d),
       lin(a - c, a * b - c * d),
+      lin(a + c, a * b + c * d),
       lin(a + c, a * b - c * d),
-      lin(a + c, b + d),
     ],
     expected: ({ a, b, c, d }) => lin(a - c, a * b + c * d),
     solution: ({ a, b, c, d }) =>

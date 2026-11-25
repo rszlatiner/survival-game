@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_02 } from "@/content/units/unit-02";
-import { bankChecks, overlapChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
 
 bankChecks(2, UNIT_02);
 overlapChecks(UNIT_02);
+coordinateChecks(UNIT_02);
 
 const get = (id: string) => UNIT_02.find((t) => t.id === id)!;
 
