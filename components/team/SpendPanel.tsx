@@ -39,7 +39,7 @@ export function BuildPanel({ team, busy, act }: Omit<Props, "bonus">) {
   return (
     <section aria-label="Build" className={`${panel} space-y-2`}>
       <h2 className="text-lg font-black">Build</h2>
-      <div className="grid gap-2">
+      <div className="grid gap-3 pr-1">
         {(Object.keys(BUILDS) as BuildId[]).map((id) => {
           const def = BUILDS[id];
           const built = team.builds.includes(id);
@@ -52,13 +52,13 @@ export function BuildPanel({ team, busy, act }: Omit<Props, "bonus">) {
               disabled={disabled}
               aria-label={`Build ${BUILD_LABEL[id]}`}
               onClick={() => act({ type: "build", item: id })}
-              className={`flex min-h-16 items-center gap-3 rounded-2xl border-4 px-3 py-2 text-left transition-transform active:translate-y-0.5 disabled:cursor-not-allowed ${
+              className={`flex min-h-16 items-center gap-3 border-4 px-3 py-2 text-left shadow-[4px_4px_0_#000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed ${
                 built
                   ? "border-palm-700 bg-palm-200 text-night-900"
                   : "border-palm-800 bg-palm-700 text-white disabled:border-sand-300 disabled:bg-sand-100 disabled:text-sand-900"
               }`}
             >
-              <span className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-night-900 bg-sand-50">
+              <span className="grid size-12 shrink-0 place-items-center border-4 border-void bg-sand-50">
                 <BuildIcon id={id} size={34} />
               </span>
               <span>
@@ -103,7 +103,7 @@ export function MarketPanel({ team, bonus, busy, act }: Props) {
       </select>
       <label className={label} htmlFor="m-amt">Amount to get</label>
       <input id="m-amt" inputMode="numeric" className={select} value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 3))} />
-      <p data-testid="market-cost" className="rounded-xl bg-white px-3 py-2 font-black">
+      <p data-testid="market-cost" className="border-4 border-void bg-white px-3 py-2 font-black text-void">
         {give === get ? "Pick two different resources." : `Costs ${cost} ${give}`}
       </p>
       <button

@@ -10,6 +10,7 @@ import { hostErrorText } from "./labels";
 import { Palm, TimerIcon, TreasureMapBorder } from "@/components/art";
 import { IslandBackdrop } from "@/components/ui/Backdrop";
 import { Wordmark } from "@/components/ui/Wordmark";
+import { PressStart } from "@/components/ui/PressStart";
 import { btn, field, panel } from "@/components/ui/styles";
 
 export interface UnitReadiness {
@@ -114,9 +115,9 @@ export function CreateGame({ readiness }: { readiness: UnitReadiness[] }) {
   return (
     <main className="relative isolate mx-auto min-h-screen max-w-2xl space-y-5 p-4">
       <IslandBackdrop />
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border-4 border-sunset-400 bg-night-800/95 p-4 text-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border-4 border-sunset-400 bg-night-800 shadow-[6px_6px_0_#000] p-4 text-white">
         <Wordmark as="p" />
-        <h1 className="rounded-full bg-sunset-400 px-4 py-1 text-2xl font-black text-night-900">New game</h1>
+        <h1 className="bg-sunset-400 px-4 py-1 text-2xl font-black text-night-900">New game</h1>
       </div>
       {saved.length > 0 && (
         <section aria-label="Resume your game" className={`${panel} space-y-2`}>
@@ -181,7 +182,7 @@ export function CreateGame({ readiness }: { readiness: UnitReadiness[] }) {
                   </label>
                   <span
                     data-testid={`ready-${u}`}
-                    className={`rounded-full px-2 py-0.5 text-sm font-bold text-white ${ready ? "bg-palm-700" : "bg-coral-600"}`}
+                    className={`px-2 py-0.5 text-sm font-bold text-white ${ready ? "bg-palm-700" : "bg-coral-600"}`}
                   >
                     {ready ? "Ready" : "Not ready"}{r ? ` (${r.count})` : ""}
                   </span>
@@ -227,7 +228,7 @@ export function CreateGame({ readiness }: { readiness: UnitReadiness[] }) {
         {error && <p role="alert" className="rounded-2xl bg-coral-700 p-3 font-semibold text-white">{error}</p>}
 
         {confirming ? (
-          <div className="space-y-2 rounded-2xl border-2 border-coral-600 bg-white p-3">
+          <div className="space-y-2 border-4 border-coral-600 bg-white p-3">
             <p className="font-bold">Create the game even though some selected units are not ready?</p>
             <div className="flex gap-2">
               <button type="submit" disabled={busy} className={btn("coral")}>
@@ -239,9 +240,12 @@ export function CreateGame({ readiness }: { readiness: UnitReadiness[] }) {
             </div>
           </div>
         ) : (
+          <>
+          <PressStart />
           <button type="submit" disabled={busy} className={btn("sunset", "min-h-14 w-full text-xl")}>
             Create game
           </button>
+          </>
         )}
       </form>
       </TreasureMapBorder>

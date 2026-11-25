@@ -14,6 +14,7 @@ import { useCountdown } from "./useCountdown";
 import { CrownIcon, HazardIcon, RaftIcon, StarIcon, Sun, TimerIcon, TrophyIcon, ZONE_COLOR } from "@/components/art";
 import { IslandBackdrop } from "@/components/ui/Backdrop";
 import { Wordmark } from "@/components/ui/Wordmark";
+import { PressStart } from "@/components/ui/PressStart";
 import { btn as tone, card, field, panel } from "@/components/ui/styles";
 
 interface Props {
@@ -61,7 +62,7 @@ export function HostScreen({ state, status, send, login }: Props) {
     ) : null;
 
   const shell = (body: React.ReactNode) => (
-    <div className="relative isolate min-h-screen text-night-900">
+    <div className="relative isolate min-h-screen text-white">
       <IslandBackdrop />
       {banner}
       <main className="mx-auto max-w-4xl space-y-4 p-4 pb-24">{body}</main>
@@ -84,7 +85,7 @@ export function HostScreen({ state, status, send, login }: Props) {
   const revealLabel = phase === "tiebreak" ? "Reveal tiebreak result" : "Reveal answers";
 
   const authPrompt = authLost ? (
-    <section role="alert" className="space-y-2 rounded-3xl border-4 border-coral-600 bg-sand-50 p-4">
+    <section role="alert" className="space-y-2 border-4 border-coral-500 bg-sand-50 p-4 text-void">
       <p className="font-bold">Your host session has expired. Sign in again with the teacher password.</p>
       <HostSignIn code={state.code} login={login} onSignedIn={() => setAuthLost(false)} />
     </section>
@@ -93,7 +94,7 @@ export function HostScreen({ state, status, send, login }: Props) {
   return shell(
     <>
       {authPrompt}
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border-4 border-sunset-400 bg-night-800/95 p-4 text-white">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border-4 border-sunset-400 bg-night-800 shadow-[6px_6px_0_#000] p-4 text-white">
         <div className="space-y-2">
           <Wordmark as="p" />
           <h1 className="text-2xl font-black">Host screen</h1>
@@ -104,7 +105,7 @@ export function HostScreen({ state, status, send, login }: Props) {
         <div className="space-y-1 text-right">
           <p data-testid="phase" className="text-lg font-black capitalize">{phase}{round && phase !== "lobby" ? `, round ${round.n} of ${state.totalRounds}` : ""}</p>
           {live && (
-            <p className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 font-mono text-3xl font-black text-night-900">
+            <p className="inline-flex items-center gap-2 bg-white px-3 py-1 font-mono text-3xl font-black text-night-900">
               <TimerIcon size={30} />
               <span aria-label={`${remaining} seconds left`}>{remaining}s</span>
             </p>
@@ -123,6 +124,7 @@ export function HostScreen({ state, status, send, login }: Props) {
       ) : (
         <section aria-label="Game controls" className={`${panel} space-y-3`}>
           <div className="flex flex-wrap gap-2">
+            {phase === "lobby" && state.teams.length > 0 && <PressStart onDark className="basis-full text-left" />}
             {phase === "lobby" && (
               <button type="button" disabled={busy || state.teams.length === 0} onClick={() => void act({ type: "start" })} className={tone("palm")}>
                 <StarIcon size={24} />
@@ -130,7 +132,7 @@ export function HostScreen({ state, status, send, login }: Props) {
               </button>
             )}
             {phase === "lobby" && state.teams.length === 0 && (
-              <p data-testid="start-hint" className="self-center text-sm font-bold text-coral-700">Start unlocks when at least one team has joined.</p>
+              <p data-testid="start-hint" className="self-center text-sm font-bold text-sunset-300">Start unlocks when at least one team has joined.</p>
             )}
             <button type="button" disabled={!canNext} onClick={() => void act({ type: "next" })} className={tone("ocean")}>
               <RaftIcon size={26} />
@@ -170,13 +172,13 @@ export function HostScreen({ state, status, send, login }: Props) {
           )}
 
           {phase === "tiebreak" && (
-            <p className="rounded-xl bg-sunset-200 p-2 text-sm font-semibold">
+            <p className="bg-sunset-200 p-2 text-sm font-semibold text-void">
               Tiebreak in progress. Press Reveal to decide it. Ending the game decides it too.
             </p>
           )}
 
           {confirmEnd ? (
-            <div role="group" aria-label="Confirm end game" className="space-y-2 rounded-2xl border-4 border-coral-600 bg-white p-3">
+            <div role="group" aria-label="Confirm end game" className="space-y-2 border-4 border-coral-500 bg-white p-3 text-void">
               <p className="font-bold">
                 {phase === "tiebreak"
                   ? "End the game now? This decides the tiebreak with the answers so far."
@@ -236,7 +238,7 @@ function RevealSummary({ state }: { state: PublicGameState }) {
       <h2 className="font-black">Round results</h2>
       <ul className="space-y-1">
         {state.teams.filter((t) => results[t.id]).map((t) => (
-          <li key={t.id} className={`flex items-center gap-2 rounded-xl px-2 py-1 ${results[t.id].correct ? "bg-palm-200" : "bg-coral-200"}`}>
+          <li key={t.id} className={`flex items-center gap-2 px-2 py-1 text-void ${results[t.id].correct ? "bg-palm-200" : "bg-coral-200"}`}>
             {results[t.id].correct ? <StarIcon size={20} /> : <span aria-hidden="true" className="w-5" />}
             {t.name}: {results[t.id].correct ? "correct" : "not correct"} (answer {results[t.id].expected})
           </li>
@@ -268,7 +270,7 @@ function TeamRow({ team, lobby, finished, act }: { team: PublicTeam; lobby: bool
     <li className={`${card} space-y-2 border-l-8`} style={{ borderLeftColor: ZONE_COLOR[team.zone].hex }}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-lg font-black">{team.name}</span>
-        <span className={`rounded-full px-2 py-0.5 text-sm font-bold ${ZONE_COLOR[team.zone].bg} ${ZONE_COLOR[team.zone].text}`}>{ZONES[team.zone].name} - {team.deviceCount} device(s) - {team.sp} SP</span>
+        <span className={`px-2 py-0.5 text-sm font-bold ${ZONE_COLOR[team.zone].bg} ${ZONE_COLOR[team.zone].text}`}>{ZONES[team.zone].name} - {team.deviceCount} device(s) - {team.sp} SP</span>
       </div>
       {lobby && (
         <div className="flex flex-wrap items-end gap-2">

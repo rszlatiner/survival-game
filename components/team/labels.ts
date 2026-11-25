@@ -8,8 +8,6 @@ export const RESOURCE_LABEL: Record<Resource, string> = {
   stone: "Stone",
 };
 
-export const RESOURCE_ICON: Record<Resource, string> = { water: "💧", food: "🍖", wood: "🪵", stone: "🪨" };
-
 export const BUILD_LABEL: Record<BuildId, string> = {
   shelter: "Shelter",
   fire: "Fire",

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 /** Props every art component accepts. */
 export interface ArtProps {
-  /** Width and height in px (or any CSS length). Defaults to 1em so icons follow the font size. */
+  /** Width in px (or any CSS length). Defaults to 1em so icons follow the font size. */
   size?: number | string;
   className?: string;
   /**
@@ -12,7 +12,7 @@ export interface ArtProps {
   title?: string;
 }
 
-/** Shared SVG wrapper: decorative (aria-hidden) unless a title is given. */
+/** Shared SVG wrapper: decorative (aria-hidden) unless a title is given. `crisp` keeps pixel art sharp. */
 export function Svg({
   size = "1em",
   className,
@@ -21,8 +21,16 @@ export function Svg({
   width,
   height,
   preserveAspectRatio,
+  crisp = false,
   children,
-}: ArtProps & { viewBox?: string; width?: number | string; height?: number | string; preserveAspectRatio?: string; children: ReactNode }) {
+}: ArtProps & {
+  viewBox?: string;
+  width?: number | string;
+  height?: number | string;
+  preserveAspectRatio?: string;
+  crisp?: boolean;
+  children: ReactNode;
+}) {
   const a11y = title ? { role: "img", "aria-label": title } : { "aria-hidden": true as const, focusable: "false" as const };
   return (
     <svg
@@ -32,6 +40,8 @@ export function Svg({
       height={height ?? size}
       className={className}
       preserveAspectRatio={preserveAspectRatio}
+      shapeRendering={crisp ? "crispEdges" : undefined}
+      style={crisp ? { imageRendering: "pixelated" } : undefined}
       {...a11y}
     >
       {children}

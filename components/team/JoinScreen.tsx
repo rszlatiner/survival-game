@@ -9,6 +9,7 @@ import { errorText } from "./labels";
 import { TreasureMapBorder, ZONE_COLOR } from "@/components/art";
 import { IslandBackdrop } from "@/components/ui/Backdrop";
 import { Wordmark } from "@/components/ui/Wordmark";
+import { PressStart } from "@/components/ui/PressStart";
 import { bigField, btn } from "@/components/ui/styles";
 
 export function JoinScreen({ initialCode = "", onJoined }: { initialCode?: string; onJoined: (code: string) => void }) {
@@ -43,7 +44,7 @@ export function JoinScreen({ initialCode = "", onJoined }: { initialCode?: strin
   return (
     <main className="relative isolate mx-auto min-h-screen max-w-md space-y-5 p-4 pt-6">
       <IslandBackdrop />
-      <div className="rounded-3xl border-4 border-sunset-400 bg-night-800/95 p-4 shadow-[0_8px_0_rgb(11_26_51/0.35)]">
+      <div className="rounded-3xl border-4 border-sunset-400 bg-night-800 shadow-[6px_6px_0_#000] p-4 shadow-[6px_6px_0_#000]">
         <Wordmark />
       </div>
       <TreasureMapBorder>
@@ -59,6 +60,7 @@ export function JoinScreen({ initialCode = "", onJoined }: { initialCode?: strin
             maxLength={6}
             className={`${input} text-center font-black uppercase tracking-[0.3em]`}
           />
+          <PressStart />
           <button type="submit" disabled={busy || code.length === 0} className={big}>Find game</button>
         </form>
       ) : (
@@ -68,7 +70,7 @@ export function JoinScreen({ initialCode = "", onJoined }: { initialCode?: strin
             <div className="space-y-2">
               <h2 className="text-lg font-black">Join a team</h2>
               {game.teams.map((t) => (
-                <button key={t.id} type="button" disabled={busy} aria-label={`Join ${t.name}`} onClick={() => void join({ teamId: t.id })} className={`flag min-h-14 w-full rounded-l-2xl border-l-8 border-night-900 px-4 pr-10 text-left text-lg font-black disabled:opacity-50 ${ZONE_COLOR[t.zone].bg} ${ZONE_COLOR[t.zone].text}`}>
+                <button key={t.id} type="button" disabled={busy} aria-label={`Join ${t.name}`} onClick={() => void join({ teamId: t.id })} className={`flag min-h-14 w-full border-4 border-void px-4 pr-10 text-left text-lg font-black disabled:opacity-50 ${ZONE_COLOR[t.zone].bg} ${ZONE_COLOR[t.zone].text}`}>
                   {t.name} <span className="text-sm font-semibold">({t.deviceCount} device{t.deviceCount === 1 ? "" : "s"})</span>
                 </button>
               ))}
@@ -81,7 +83,7 @@ export function JoinScreen({ initialCode = "", onJoined }: { initialCode?: strin
               <button type="submit" disabled={busy || name.trim() === ""} className={big}>Create team</button>
             </form>
           )}
-          <button type="button" onClick={() => setGame(null)} className="min-h-12 font-bold text-ocean-800 underline">Different code</button>
+          <button type="button" onClick={() => setGame(null)} className="min-h-12 font-bold uppercase text-ocean-800 underline">Different code</button>
         </div>
       )}
       </TreasureMapBorder>

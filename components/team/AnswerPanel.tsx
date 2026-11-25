@@ -74,7 +74,7 @@ export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy,
               type="button"
               aria-pressed={value === o}
               onClick={() => set(o)}
-              className={`min-h-14 rounded-2xl border-4 px-4 text-lg font-bold ${value === o ? "border-night-900 bg-ocean-600 text-white" : "border-ocean-700 bg-white text-night-900"}`}
+              className={`min-h-14 border-4 border-void px-4 text-lg font-bold shadow-[4px_4px_0_#000] ${value === o ? "translate-x-0.5 translate-y-0.5 bg-ocean-300 text-void shadow-[2px_2px_0_#000]" : "bg-white text-void"}`}
             >
               {o}
             </button>

@@ -1,6 +1,6 @@
-const COLORS = ["#ffc53d", "#f4623a", "#22c5c0", "#86d993", "#fff8e7", "#ffb199"];
+const COLORS = ["#ffd23f", "#ff6b4a", "#2ce0d0", "#3bd16f", "#fff4d6", "#4cc9ff"];
 
-/** CSS-only falling confetti for the winner screen. Hidden under prefers-reduced-motion. */
+/** 8-bit confetti blocks for the winner screen (CSS only). Hidden under prefers-reduced-motion. */
 export function Confetti({ pieces = 36 }: { pieces?: number }) {
   return (
     <div aria-hidden="true" data-testid="confetti" className="confetti">

@@ -7,6 +7,7 @@ import * as Art from "@/components/art";
 import { Confetti } from "@/components/ui/Confetti";
 import { IslandBackdrop, NightBackdrop } from "@/components/ui/Backdrop";
 import { Wordmark } from "@/components/ui/Wordmark";
+import { PressStart } from "@/components/ui/PressStart";
 import { btn } from "@/components/ui/styles";
 import type { ZoneId } from "@/lib/questions/types";
 
@@ -38,6 +39,7 @@ const simple = {
   Crab: Art.Crab,
   Parrot: Art.Parrot,
   Cloud: Art.Cloud,
+  Pufferfish: Art.Pufferfish,
 } as const;
 
 describe("art set", () => {
@@ -74,7 +76,7 @@ describe("art set", () => {
   });
 
   it("raft stages add parts", () => {
-    const count = (stage: 1 | 2 | 3) => render(<Art.RaftIcon stage={stage} />).container.querySelectorAll("path").length;
+    const count = (stage: 1 | 2 | 3) => render(<Art.RaftIcon stage={stage} />).container.querySelectorAll("rect").length;
     expect(count(2)).toBeGreaterThan(count(1));
     expect(count(3)).toBeGreaterThan(count(2));
   });
@@ -109,6 +111,34 @@ describe("art set", () => {
   });
 });
 
+describe("retro pixel style", () => {
+  it("sprites render crisp, pixelated rects", () => {
+    const { container } = render(<Art.CrownIcon size={48} />);
+    const svg = container.querySelector("svg")!;
+    expect(svg.getAttribute("shape-rendering")).toBe("crispEdges");
+    expect(svg.querySelectorAll("rect").length).toBeGreaterThan(5);
+  });
+
+  it("sprite() rejects uneven rows and merges runs", () => {
+    expect(() => Art.sprite(["ab", "abc"])).toThrow();
+    expect(Art.sprite(["kkk."]).rects).toEqual([{ x: 0, y: 0, w: 3, c: Art.PAL.k }]);
+  });
+
+  it("PRESS START is decoration only", () => {
+    const { container } = render(<PressStart />);
+    expect(container.firstElementChild!.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("scanlines live only in the projector backdrop, behind content", () => {
+    const team = render(<IslandBackdrop />);
+    expect(team.container.querySelector(".scanlines")).toBeNull();
+    team.unmount();
+    const proj = render(<NightBackdrop />);
+    const lines = proj.container.querySelector(".scanlines")!;
+    expect(lines.closest("[aria-hidden='true']")!.className).toContain("-z-10");
+  });
+});
+
 describe("motion and theme CSS", () => {
   const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
 
@@ -117,13 +147,22 @@ describe("motion and theme CSS", () => {
     expect(block).toMatch(/animation:\s*none\s*!important/);
     expect(block).toMatch(/\.confetti/);
     expect(block).toMatch(/\.celebrate::before/);
+    expect(block).toMatch(/\.scanlines/);
+  });
+
+  it("uses stepped (8-bit) timing for the animations", () => {
+    for (const name of ["wave-drift", "bob", "sun-spin", "pop-in", "blink"]) {
+      expect(css).toMatch(new RegExp(`--animate-${name}:[^;]*steps\\(`));
+    }
+    expect(css).toMatch(/coin-pop[^;]*steps\(/);
+    expect(css).toMatch(/confetti-fall[^;]*steps\(/);
   });
 
   it("defines the tropical palette and rounded font stack in the Tailwind theme", () => {
-    for (const token of ["--color-ocean-600", "--color-sand-50", "--color-palm-700", "--color-coral-600", "--color-sunset-400", "--color-night-900", "--font-rounded"]) {
+    for (const token of ["--color-void", "--color-ocean-300", "--color-sand-50", "--color-palm-700", "--color-coral-600", "--color-sunset-400", "--color-night-900", "--font-pixel"]) {
       expect(css).toContain(token);
     }
-    expect(css).toMatch(/--font-rounded:\s*ui-rounded/);
+    expect(css).toMatch(/--font-pixel:\s*ui-monospace/);
     expect(css).not.toMatch(/@import\s+url\(|https?:\/\//);
   });
 });

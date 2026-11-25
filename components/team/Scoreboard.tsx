@@ -32,7 +32,7 @@ export function Scoreboard({
   return (
     <section aria-label="Scoreboard" className={big ? nightPanel : panel}>
       <h2 className={`mb-2 font-black uppercase tracking-wide ${big ? "text-3xl" : "text-sm"}`}>Scoreboard</h2>
-      <ol className={big ? "space-y-2" : "space-y-1"}>
+      <ol className={big ? "space-y-2" : "space-y-1 text-sm"}>
         {rankTeams(teams, winnerId).map((t, i) => {
           const stage = raftStage(t);
           const mine = t.id === myId;
@@ -40,14 +40,14 @@ export function Scoreboard({
             <li
               key={t.id}
               className={`flex items-center justify-between gap-2 rounded-xl px-2 py-1 ${
-                mine ? "border-2 border-ocean-700 bg-ocean-100 font-extrabold" : big ? "bg-night-700" : "bg-white"
+                mine ? "border-4 border-void bg-sunset-400 font-extrabold text-void" : "bg-night-700"
               }`}
             >
-              <span className="flex items-center gap-2">
+              <span className="flex min-w-0 items-center gap-2">
                 {i < 3 ? <MedalIcon place={(i + 1) as 1 | 2 | 3} size={big ? 44 : 24} /> : <span className={big ? "w-11" : "w-6"} aria-hidden="true" />}
-                <span>{t.name}</span>
+                <span className="min-w-0 break-words">{t.name}</span>
               </span>
-              <span className="flex items-center gap-1">
+              <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
                 <StarIcon size={big ? 36 : 20} />
                 {stage > 0 && <RaftIcon stage={stage as 1 | 2 | 3} size={big ? 40 : 22} />}
                 <span>

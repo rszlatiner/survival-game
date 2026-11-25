@@ -90,7 +90,7 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
     ) : null;
 
   const shell = (body: React.ReactNode) => (
-    <div className="relative isolate min-h-screen text-night-900">
+    <div className="relative isolate min-h-screen text-white">
       <IslandBackdrop />
       {banner}
       <main className="mx-auto max-w-md space-y-4 p-3 pb-24">{body}</main>
@@ -104,22 +104,22 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
 
   const header = (
     <header className="space-y-3">
-      <div className={`flag flex items-center justify-between gap-2 rounded-l-3xl border-l-8 border-night-900 py-3 pl-4 pr-10 shadow-[0_6px_0_rgb(11_26_51/0.2)] ${zc.bg} ${zc.text}`}>
+      <div className={`flag flex items-center justify-between gap-2 rounded-l-3xl border-4 border-void py-3 pl-4 pr-10 shadow-[6px_6px_0_#000] ${zc.bg} ${zc.text}`}>
         <h1 className="text-2xl font-black">{team.name}</h1>
         {isCaptain && (
-          <span className="inline-flex items-center gap-1 rounded-full border-2 border-night-900 bg-sunset-400 px-3 py-1 text-sm font-black text-night-900">
+          <span className="inline-flex items-center gap-1 border-4 border-void bg-sunset-400 px-3 py-1 text-sm font-black text-night-900">
             <CrownIcon size={18} />
             Captain
           </span>
         )}
       </div>
       {state.phase !== "lobby" && (
-        <section aria-label="Your zone" className="overflow-hidden rounded-3xl border-4 border-white bg-sand-50 shadow-[0_6px_0_rgb(11_26_51/0.18)]">
-          <div className="h-24 border-b-4 border-white sm:h-32">
+        <section aria-label="Your zone" className="overflow-hidden border-4 border-white bg-sand-50 text-void shadow-[6px_6px_0_#000]">
+          <div className="h-24 border-b-4 border-void sm:h-32">
             <ZoneScene zone={team.zone} />
           </div>
           <div className="space-y-1 p-3">
-            <h2 className={`inline-block rounded-full px-3 py-0.5 text-lg font-black ${zc.bg} ${zc.text}`}>{ZONES[team.zone].name}</h2>
+            <h2 className={`inline-block px-3 py-0.5 text-lg font-black ${zc.bg} ${zc.text}`}>{ZONES[team.zone].name}</h2>
             <p data-testid="story" className="text-base">{ZONE_STORY[team.zone]}</p>
           </div>
         </section>
@@ -167,15 +167,15 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
         {header}
         <section aria-label="Problem" className={`${panel} space-y-3`}>
           <div className="flex items-center justify-between gap-2 text-sm font-black">
-            <span className="rounded-full bg-ocean-700 px-3 py-1 text-white">{state.phase === "tiebreak" ? "Tiebreak" : `Round ${round?.n ?? ""} of ${state.totalRounds}`}</span>
-            <span className={`inline-flex items-center gap-1 rounded-full border-2 px-3 py-1 text-lg ${remaining <= 10 ? "border-coral-700 bg-coral-600 text-white" : "border-night-900 bg-white"}`}>
+            <span className="bg-ocean-700 px-3 py-1 text-white">{state.phase === "tiebreak" ? "Tiebreak" : `Round ${round?.n ?? ""} of ${state.totalRounds}`}</span>
+            <span className={`inline-flex items-center gap-1 border-2 px-3 py-1 text-lg ${remaining <= 10 ? "border-coral-700 bg-coral-600 text-white" : "border-void bg-white text-void"}`}>
               <TimerIcon size={22} />
               <span aria-label={`${remaining} seconds left`}>{remaining}s</span>
             </span>
           </div>
           {q ? (
             <>
-              <p className="whitespace-pre-wrap rounded-2xl bg-white p-3 text-xl font-semibold">{q.prompt}</p>
+              <p className="whitespace-pre-wrap border-4 border-void bg-white p-3 text-xl font-semibold text-void">{q.prompt}</p>
               <AnswerPanel
                 question={q}
                 canSubmit={canSubmit}

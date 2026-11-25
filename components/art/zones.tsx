@@ -1,35 +1,46 @@
-import { useId } from "react";
 import type { ZoneId } from "@/lib/questions/types";
-import { INK } from "./resources";
-import { CloudG, CrabG, PalmG, ParrotG, ShellG, SunG } from "./scenery";
+import { PAL, SpriteG } from "./pixel";
+import { CLOUD, CRAB, PALM, PARROT, PUFFER, SHELL, STONE, SUN, WAVE_TILE } from "./sprites";
 import { Svg, type ArtProps } from "./Svg";
 
-/** Bold colour per zone; text colour on it passes WCAG AA. */
+/** Bold colour per zone; the text colour on it passes WCAG AA. */
 export const ZONE_COLOR: Record<ZoneId, { bg: string; text: string; hex: string }> = {
-  beach: { bg: "bg-zone-beach", text: "text-night-900", hex: "#f2b705" },
+  beach: { bg: "bg-zone-beach", text: "text-night-900", hex: "#ffd23f" },
   forest: { bg: "bg-zone-forest", text: "text-white", hex: "#1d6b35" },
   cave: { bg: "bg-zone-cave", text: "text-white", hex: "#5b3f8c" },
   hills: { bg: "bg-zone-hills", text: "text-white", hex: "#9a4a1f" },
   lagoon: { bg: "bg-zone-lagoon", text: "text-white", hex: "#0a6a6d" },
 };
 
-const SKY = "#8edcf5";
-const SEA = "#0fa3a8";
-const SAND = "#efc879";
-const wave = (y: number) => `M0 ${y}q20-6 40 0t40 0 40 0 40 0 40 0 40 0 40 0 40 0`;
+const SKY = "#5cc8f0";
+type Row = [y: number, x: number, w: number, color: string];
+/** Stepped rows of rects: the scenes' hills, rocks and shores. */
+const Rows = ({ rows }: { rows: Row[] }) => (
+  <>
+    {rows.map(([y, x, w, c], i) => (
+      <rect key={i} x={x} y={y} width={w} height={1} fill={c} />
+    ))}
+  </>
+);
+const band = (y: number, h: number, c: string) => <rect y={y} width={96} height={h} fill={c} />;
+const waveRow = (y: number) =>
+  Array.from({ length: 6 }, (_, i) => <SpriteG key={`w${y}${i}`} s={WAVE_TILE} x={i * 16} y={y} />);
+/** Pyramid of rows centred on cx, widening by `step` each row. */
+const mound = (cx: number, top: number, h: number, step: number, c: string): Row[] =>
+  Array.from({ length: h }, (_, i) => [top + i, cx - (i + 1) * step, (i + 1) * step * 2, c]);
 
 function Beach() {
   return (
     <>
-      <rect width="320" height="100" fill={SKY} />
-      <SunG x={250} y={6} s={0.9} />
-      <CloudG x={40} y={10} s={1.1} />
-      <rect y="48" width="320" height="22" fill={SEA} />
-      <path d={wave(52)} fill="none" stroke="#effcfb" strokeWidth={2} />
-      <path d="M0 66c60-8 120 4 180-2s100-6 140 0v36H0z" fill={SAND} />
-      <PalmG x={8} y={30} s={1.1} />
-      <ShellG x={150} y={74} s={0.9} />
-      <CrabG x={210} y={72} s={0.9} />
+      {band(0, 30, SKY)}
+      <SpriteG s={SUN} x={80} y={1} />
+      <SpriteG s={CLOUD} x={24} y={3} />
+      {waveRow(12)}
+      {band(18, 12, PAL.s)}
+      <Rows rows={[[17, 30, 40, PAL.s], [16, 40, 20, PAL.s]]} />
+      <SpriteG s={PALM} x={2} y={13} />
+      <SpriteG s={SHELL} x={46} y={17} />
+      <SpriteG s={CRAB} x={64} y={17} />
     </>
   );
 }
@@ -37,14 +48,14 @@ function Beach() {
 function Forest() {
   return (
     <>
-      <rect width="320" height="100" fill={SKY} />
-      <CloudG x={200} y={6} />
-      <path d="M0 60c30-24 60-24 90-6 30-24 70-26 100-4 30-22 80-22 130 0v50H0z" fill="#1f8a43" />
-      <path d="M0 78c40-16 90-16 130-2 40-14 100-16 190 0v24H0z" fill="#155027" />
-      <PalmG x={-6} y={22} s={1.2} />
-      <PalmG x={110} y={30} s={1} flip />
-      <PalmG x={250} y={26} s={1.1} />
-      <ParrotG x={176} y={44} s={1.1} />
+      {band(0, 30, SKY)}
+      <SpriteG s={CLOUD} x={60} y={2} />
+      <Rows rows={[...mound(20, 14, 16, 3, PAL.g), ...mound(70, 12, 18, 3, PAL.g)]} />
+      {band(24, 6, PAL.G)}
+      <SpriteG s={PALM} x={0} y={10} />
+      <SpriteG s={PALM} x={30} y={13} flip />
+      <SpriteG s={PALM} x={78} y={11} />
+      <SpriteG s={PARROT} x={54} y={12} />
     </>
   );
 }
@@ -52,14 +63,12 @@ function Forest() {
 function Cave() {
   return (
     <>
-      <rect width="320" height="100" fill="#5cc8f0" />
-      <path d="M40 100L70 30l50-18 70 6 60 22 40 60z" fill="#64748b" stroke={INK} strokeWidth={1.5} strokeLinejoin="round" />
-      <path d="M120 100c0-34 18-54 40-54s40 20 40 54z" fill="#1e293b" stroke={INK} strokeWidth={1.5} />
-      <path d="M140 46l4 10 4-9M166 46l4 9 4-8" fill="#94a3b8" />
-      <path d="M88 40l22 8M210 34l20 14" stroke="#94a3b8" strokeWidth={2} strokeLinecap="round" />
-      <rect y="86" width="320" height="14" fill={SEA} />
-      <path d={wave(88)} fill="none" stroke="#effcfb" strokeWidth={2} />
-      <path d="M150 86c6 4 14 4 20 0" stroke="#38bdf8" strokeWidth={3} fill="none" strokeLinecap="round" />
+      {band(0, 30, SKY)}
+      <Rows rows={mound(48, 2, 22, 2, PAL.e)} />
+      <Rows rows={[...mound(48, 12, 12, 1, PAL.k), [8, 30, 4, PAL.E], [14, 58, 6, PAL.E], [18, 24, 5, PAL.E]]} />
+      <Rows rows={[[12, 46, 1, PAL.w], [12, 50, 1, PAL.w], [13, 46, 1, PAL.w]]} />
+      {waveRow(24)}
+      <SpriteG s={PUFFER} x={6} y={18} />
     </>
   );
 }
@@ -67,13 +76,15 @@ function Cave() {
 function Hills() {
   return (
     <>
-      <rect width="320" height="100" fill={SKY} />
-      <SunG x={20} y={8} s={0.8} />
-      <CloudG x={230} y={12} />
-      <path d="M90 100l60-80 30 34 24-26 60 72z" fill="#9a4a1f" stroke={INK} strokeWidth={1.5} strokeLinejoin="round" />
-      <path d="M150 20l-14 20 14-6 12 8z" fill="#fff8e7" />
-      <path d="M0 78c50-22 110-22 160 0s110 20 160-4v26H0z" fill="#b98a57" />
-      <path d="M40 80l10-8 12 2 4 8zM240 86l12-10 10 4 2 8z" fill="#94a3b8" stroke={INK} strokeWidth={1.2} strokeLinejoin="round" />
+      {band(0, 30, SKY)}
+      <SpriteG s={SUN} x={4} y={2} />
+      <SpriteG s={CLOUD} x={70} y={3} />
+      <Rows rows={mound(50, 4, 22, 2, "#9a4a1f")} />
+      <Rows rows={mound(50, 4, 4, 2, PAL.w)} />
+      <Rows rows={mound(78, 12, 14, 2, "#7a3a18")} />
+      {band(24, 6, "#c99a5b")}
+      <SpriteG s={STONE} x={14} y={16} />
+      <SpriteG s={STONE} x={84} y={18} />
     </>
   );
 }
@@ -81,81 +92,95 @@ function Hills() {
 function Lagoon() {
   return (
     <>
-      <rect width="320" height="100" fill={SKY} />
-      <CloudG x={30} y={8} s={0.9} />
-      <SunG x={262} y={4} s={0.7} />
-      <rect y="44" width="320" height="56" fill="#0a6a6d" />
-      <ellipse cx="160" cy="74" rx="150" ry="22" fill="#22c5c0" />
-      <ellipse cx="160" cy="74" rx="110" ry="14" fill="#5eead4" />
-      <path d="M120 74c14-10 66-10 80 0z" fill={SAND} />
-      <PalmG x={126} y={22} s={0.85} />
-      <path d={wave(56)} fill="none" stroke="#effcfb" strokeWidth={2} />
-      <path d="M30 86c6-4 12-4 18 0M270 84c6-4 12-4 18 0" fill="none" stroke="#effcfb" strokeWidth={2} strokeLinecap="round" />
+      {band(0, 30, SKY)}
+      <SpriteG s={CLOUD} x={6} y={2} />
+      <SpriteG s={SUN} x={82} y={1} />
+      {waveRow(12)}
+      {band(17, 13, PAL.B)}
+      <Rows rows={[[18, 8, 80, PAL.t], [19, 4, 88, PAL.t], [20, 2, 92, PAL.t], [21, 2, 92, PAL.t], [22, 4, 88, PAL.t], [23, 8, 80, PAL.t]]} />
+      <Rows rows={[[19, 36, 24, PAL.s], [20, 34, 28, PAL.s], [21, 36, 24, PAL.s]]} />
+      <SpriteG s={PALM} x={40} y={5} />
+      <SpriteG s={PUFFER} x={74} y={20} />
     </>
   );
 }
 
 const SCENES: Record<ZoneId, () => React.ReactElement> = { beach: Beach, forest: Forest, cave: Cave, hills: Hills, lagoon: Lagoon };
 
-/** Wide banner illustration for a zone (team screen header). Decorative. */
+/** Wide pixel banner for a zone (team screen header). Decorative. */
 export function ZoneScene({ zone, className, title }: Omit<ArtProps, "size"> & { zone: ZoneId }) {
   const Scene = SCENES[zone];
   return (
-    <Svg viewBox="0 0 320 100" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" className={className} title={title}>
+    <Svg viewBox="0 0 96 30" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" className={className} title={title} crisp>
       <Scene />
     </Svg>
   );
 }
 
-/** Island outline and the region wedges (in a 400x260 box). Wedges are clipped to the island. */
-const ISLAND = "M40 140C30 80 90 30 170 28c80-8 170 12 198 72 24 50-8 120-88 132-80 13-170 8-210-22-25-18-26-45-30-70z";
-const C = "205,138";
-const WEDGES: Record<ZoneId, string> = {
-  forest: `${C} 0,232 0,40 120,0`,
-  hills: `${C} 120,0 290,0`,
-  cave: `${C} 290,0 400,0 400,130`,
-  lagoon: `${C} 400,130 400,260 300,260`,
-  beach: `${C} 300,260 0,260 0,232`,
-};
-
 /** Where each zone's label sits on the map, as percentages of the map box. */
 export const ZONE_ANCHOR: Record<ZoneId, { left: string; top: string }> = {
-  forest: { left: "20%", top: "50%" },
+  forest: { left: "21%", top: "50%" },
   hills: { left: "47%", top: "24%" },
-  cave: { left: "80%", top: "30%" },
-  lagoon: { left: "79%", top: "71%" },
-  beach: { left: "42%", top: "80%" },
+  cave: { left: "79%", top: "31%" },
+  lagoon: { left: "78%", top: "70%" },
+  beach: { left: "43%", top: "79%" },
 };
 
+/* The island as one pixel picture: 100x65 cells, a wobbly ellipse split into five wedges. */
+const MAP_W = 100;
+const MAP_H = 65;
+function zoneAt(deg: number): ZoneId {
+  if (deg >= -125 && deg < -62) return "hills";
+  if (deg >= -62 && deg < 0) return "cave";
+  if (deg >= 0 && deg < 70) return "lagoon";
+  if (deg >= 70 && deg < 150) return "beach";
+  return "forest";
+}
+const ISLAND_RECTS: Row[] = (() => {
+  const rows: Row[] = [];
+  for (let y = 0; y < MAP_H; y++) {
+    let run: { x: number; c: string } | null = null;
+    const flush = (x: number) => {
+      if (run) rows.push([y, run.x, x - run.x, run.c]);
+      run = null;
+    };
+    for (let x = 0; x < MAP_W; x++) {
+      const dx = x + 0.5 - 50;
+      const dy = y + 0.5 - 33;
+      const th = Math.atan2(dy, dx);
+      const edge = 1 + 0.07 * Math.sin(3 * th) + 0.04 * Math.cos(5 * th + 1);
+      const d = Math.hypot(dx / 45, dy / 28) / edge;
+      let c: string | null = null;
+      if (d < 0.86) c = ZONE_COLOR[zoneAt((th * 180) / Math.PI)].hex;
+      else if (d < 0.92) c = (x + y) % 2 ? PAL.s : ZONE_COLOR[zoneAt((th * 180) / Math.PI)].hex; // dithered shore
+      else if (d < 1) c = PAL.s;
+      else if (d < 1.06) c = (x + y) % 2 ? PAL.t : PAL.b; // dithered shallows
+      if (c === (run as { c: string } | null)?.c) continue;
+      flush(x);
+      if (c) run = { x, c };
+    }
+    flush(MAP_W);
+  }
+  return rows;
+})();
+
 /**
- * The whole island in one picture: five coloured zones inside one coastline, with
- * sea and waves around it. Decorative: the zone names and teams are laid over it as
- * HTML by the projector so they stay large and readable.
+ * The whole island in one pixel picture: five coloured zones inside one coastline,
+ * with sea and waves around it. Decorative: the projector lays the zone names and
+ * teams over it as HTML so they stay large and readable.
  */
 export function IslandMap({ className }: { className?: string }) {
-  const clip = `island-${useId().replace(/:/g, "")}`;
   return (
-    <Svg viewBox="0 0 400 260" width="100%" height="100%" preserveAspectRatio="none" className={className}>
-      <defs>
-        <clipPath id={clip}>
-          <path d={ISLAND} />
-        </clipPath>
-      </defs>
-      <rect width="400" height="260" fill="#0b7a7c" />
-      {[20, 60, 210, 245].map((y, i) => (
-        <path key={y} d={`M${i % 2 ? 250 : 10} ${y}q10-5 20 0t20 0 20 0`} fill="none" stroke="#5eead4" strokeWidth={2} strokeLinecap="round" />
+    <Svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} width="100%" height="100%" preserveAspectRatio="none" className={className} crisp>
+      <rect width={MAP_W} height={MAP_H} fill={PAL.B} />
+      {[[4, 3], [70, 2], [2, 58], [78, 60]].map(([x, y]) => (
+        <SpriteG key={`${x}`} s={WAVE_TILE} x={x} y={y} />
       ))}
-      <path d={ISLAND} fill={SAND} stroke={SAND} strokeWidth={14} />
-      <g clipPath={`url(#${clip})`}>
-        {(Object.keys(WEDGES) as ZoneId[]).map((z) => (
-          <polygon key={z} points={WEDGES[z]} fill={ZONE_COLOR[z].hex} />
-        ))}
-        <path d="M205 138L0 232M205 138L120 0M205 138L290 0M205 138L400 130M205 138L300 260" stroke="#fff8e7" strokeWidth={3} strokeDasharray="8 7" strokeLinecap="round" />
-      </g>
-      <path d={ISLAND} fill="none" stroke={INK} strokeWidth={2.5} />
-      <PalmG x={38} y={150} s={0.7} />
-      <PalmG x={330} y={196} s={0.5} flip />
-      <circle cx="205" cy="138" r="9" fill="#c43d1c" stroke="#fff8e7" strokeWidth={3} />
+      <Rows rows={ISLAND_RECTS} />
+      <SpriteG s={PALM} x={8} y={36} />
+      <SpriteG s={PALM} x={78} y={44} flip />
+      <rect x={48} y={31} width={4} height={4} fill={PAL.R} />
+      <rect x={49} y={32} width={2} height={2} fill={PAL.w} />
     </Svg>
   );
 }
