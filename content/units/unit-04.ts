@@ -21,7 +21,7 @@ const co = (n: number) => (n === 1 ? "" : `${n}`);
 
 /** Four comparison signs, indexed 0..3: >=, >, <=, <. */
 const SIGNS = [GE, ">", LE, "<"];
-const WORDS = ["at least", "more than", "at most", "fewer than"];
+const WORDS = ["at least", "more than", "at most", "less than"];
 
 export const UNIT_04: QuestionTemplate[] = [
   // ---------------- Difficulty 1 ----------------
@@ -169,7 +169,7 @@ export const UNIT_04: QuestionTemplate[] = [
     params: (rng) => ({ a: int(rng, 2, 6), b: int(rng, 1, 9), k: int(rng, 2, 9) }),
     prompt: ({ a, b, k }, zone) =>
       `${Z[zone].Place}, the camp is fed when ${a}x + ${b} > ${a * k + b}, where x is the number of baskets of ${Z[zone].food}. Which option is the solution?`,
-    options: ({ a, b, k }) => [`x > ${k}`, `x < ${k}`, `x > ${a * k}`, `x > ${a * k + 2 * b}`],
+    options: ({ a, b, k }) => [`x > ${k}`, `x < ${k}`, `x > ${a * k}`, `x < ${a * k}`],
     expected: ({ k }) => `x > ${k}`,
     solution: ({ a, b, k }) =>
       `Subtract ${b} from both sides: ${a}x > ${a * k}. Divide both sides by ${a} (a positive number, so the sign stays the same): x > ${k}.`,
@@ -330,7 +330,7 @@ export const UNIT_04: QuestionTemplate[] = [
         const a = int(rng, 2, 6);
         const b = int(rng, 2, 8);
         const n = int(rng, 3, 9);
-        if (a * n - b !== a + b + n && a * n - b > 0) return { a, b, n };
+        if (a * n - b > 0 && a * n - b !== a + b + n) return { a, b, n };
       }
       return { a: 3, b: 2, n: 4 };
     },
@@ -339,7 +339,7 @@ export const UNIT_04: QuestionTemplate[] = [
       `${a}x + ${b} = ${a * n + b}`,
       `${a}x + ${b} = ${a * n - b}`,
       `${a}x ${MINUS} ${b} = ${a * n + b}`,
-      `${a}x + ${b} = ${a + b + n}`,
+      `${a}x ${MINUS} ${b} = ${a + b + n}`,
     ],
     expected: ({ a, b, n }) => `${a}x + ${b} = ${a * n + b}`,
     solution: ({ a, b, n }) =>
@@ -360,7 +360,7 @@ export const UNIT_04: QuestionTemplate[] = [
     prompt: ({ a, c, B }, zone) =>
       `${Z[zone].Place}, planks cost ${a} shells each. You have already spent ${c} shells on ${Z[zone].rope} and may spend at most ${B} shells in total. ` +
       `Which inequality gives the number of planks, n, you can buy?`,
-    options: ({ a, c, B }) => [`${a}n + ${c} ${LE} ${B}`, `${a}n + ${c} ${GE} ${B}`, `${a}(n + ${c}) ${LE} ${B}`, `${a}n ${MINUS} ${c} ${LE} ${B}`],
+    options: ({ a, c, B }) => [`${a}n + ${c} ${LE} ${B}`, `${a}n + ${c} ${GE} ${B}`, `${a}(n + ${c}) ${GE} ${B}`, `${a}(n ${MINUS} ${c}) ${GE} ${B}`],
     expected: ({ a, c, B }) => `${a}n + ${c} ${LE} ${B}`,
     solution: ({ a, c, B }) =>
       `n planks cost ${a}n. Add the ${c} already spent: ${a}n + ${c}. The total must not go over ${B}, so it is at most ${B}: ${a}n + ${c} ${LE} ${B}.`,

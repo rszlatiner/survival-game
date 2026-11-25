@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_04 } from "@/content/units/unit-04";
-import { bankChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, eachQuestion, numsIn } from "./helpers/bank";
 
 bankChecks(4, UNIT_04);
+overlapChecks(UNIT_04);
 
 const get = (id: string) => UNIT_04.find((t) => t.id === id)!;
 const norm = (s: string) => s.replace(/−/g, "-").replace(/×/g, "*").replace(/÷/g, "/").replace(/≥/g, ">=").replace(/≤/g, "<=");
@@ -41,13 +42,13 @@ describe("unit 4 independent recompute", () => {
   it("two-step-sub-01", () => satisfies("u04-two-step-sub-01", /Solve (\d+x − \d+ = \d+) to find/));
   it("inequality-read-01: the right sign for the phrase, the others wrong for some value", () =>
     run("u04-inequality-read-01", (p, e, opts, where) => {
-      const phrase = /must carry (at least|more than|at most|fewer than) (\d+)/.exec(p)!;
+      const phrase = /must carry (at least|more than|at most|less than) (\d+)/.exec(p)!;
       const N = Number(phrase[2]);
       const truth: Record<string, (L: number) => boolean> = {
         "at least": (L) => L >= N,
         "more than": (L) => L > N,
         "at most": (L) => L <= N,
-        "fewer than": (L) => L < N,
+        "less than": (L) => L < N,
       };
       const agrees = (o: string) => [N - 1, N, N + 1].every((L) => holds(o, "L", L) === truth[phrase[1]](L));
       expect(opts!.filter(agrees), where).toEqual([e]);
