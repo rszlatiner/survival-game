@@ -30,7 +30,7 @@ vi.mock("@/lib/client/api", () => ({
 import { CreateGame } from "@/components/host/CreateGame";
 import { HostPlay } from "@/components/host/HostPlay";
 import { ProjectorPlay } from "@/components/host/ProjectorPlay";
-import { clearSession, loadSession, saveSession } from "@/lib/client/storage";
+import { clearSession, listSessions, loadSession, saveSession } from "@/lib/client/storage";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -92,6 +92,80 @@ beforeEach(() => {
   h.createGame.mockResolvedValue({ code: "ABCDEF" });
 });
 afterEach(cleanup);
+
+describe("resume list on the create page", () => {
+  afterEach(() => {
+    localStorage.clear();
+    clearSession("ABCDEF");
+    clearSession("BCDEFG");
+  });
+
+  it("shows the same-address hint always", () => {
+    render(<CreateGame readiness={readiness} />);
+    expect(screen.getByText("Always open the game from the same web address so your login is remembered.")).toBeTruthy();
+  });
+
+  it("shows nothing when there are no stored host sessions", () => {
+    render(<CreateGame readiness={readiness} />);
+    expect(screen.queryByText(/resume your game/i)).toBeNull();
+  });
+
+  it("lists stored host sessions with links, skips expired and team ones", async () => {
+    const now = Date.now();
+    saveSession("ABCDEF", { token: "a", role: "host", deviceId: "d", createdAt: now - 1000, expiresAt: now + 3_600_000 });
+    saveSession("BCDEFG", { token: "b", role: "host", deviceId: "d", createdAt: now - 9e7, expiresAt: now - 1 });
+    saveSession("CDEFGH", { token: "c", role: "team", deviceId: "d", teamId: "t", createdAt: now, expiresAt: now + 9e6 });
+    render(<CreateGame readiness={readiness} />);
+    expect(await screen.findByText(/resume your game/i)).toBeTruthy();
+    const link = screen.getByRole("link", { name: /ABCDEF/ });
+    expect(link.getAttribute("href")).toBe("/host/ABCDEF");
+    expect(screen.queryByRole("link", { name: /BCDEFG/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /CDEFGH/ })).toBeNull();
+    clearSession("CDEFGH");
+  });
+
+  it("removes a stored entry from the list and from storage", async () => {
+    const user = userEvent.setup();
+    saveSession("ABCDEF", { token: "a", role: "host", deviceId: "d" });
+    render(<CreateGame readiness={readiness} />);
+    await user.click(await screen.findByRole("button", { name: /remove ABCDEF/i }));
+    expect(screen.queryByRole("link", { name: /ABCDEF/ })).toBeNull();
+    expect(loadSession("ABCDEF")).toBeNull();
+    expect(listSessions()).toEqual([]);
+  });
+});
+
+describe("host screen auth loss", () => {
+  it("a 401 on an action shows the password sign-in on the same page and signs back in", async () => {
+    const user = userEvent.setup();
+    asHost();
+    setGame(state({ phase: "lobby", round: null }));
+    h.postHost.mockRejectedValueOnce(new h.ClientApiError(401, "UNAUTHORIZED"));
+    h.hostLogin.mockResolvedValue(undefined);
+    render(<HostPlay code="ABCDEF" />);
+    await user.click(await screen.findByRole("button", { name: /end game/i }));
+    await user.click(await screen.findByRole("button", { name: /yes, end the game/i }));
+    const pw = await screen.findByLabelText(/teacher password/i);
+    await user.type(pw, "pw");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+    expect(h.hostLogin).toHaveBeenCalledWith("ABCDEF", "pw");
+    await waitFor(() => expect(screen.queryByLabelText(/teacher password/i)).toBeNull());
+    expect(screen.getByTestId("join-code").textContent).toBe("ABCDEF");
+  });
+
+  it("a 500 on an action does not show the sign-in prompt", async () => {
+    const user = userEvent.setup();
+    asHost();
+    setGame(state({ phase: "lobby", round: null }));
+    h.postHost.mockRejectedValueOnce(new h.ClientApiError(500, "INTERNAL"));
+    render(<HostPlay code="ABCDEF" />);
+    await user.click(await screen.findByRole("button", { name: /end game/i }));
+    await user.click(await screen.findByRole("button", { name: /yes, end the game/i }));
+    await waitFor(() => expect(h.postHost).toHaveBeenCalled());
+    expect(screen.queryByLabelText(/teacher password/i)).toBeNull();
+    expect(loadSession("ABCDEF")).not.toBeNull();
+  });
+});
 
 describe("create game form", () => {
   it("warns about a not-ready unit and asks to confirm before creating", async () => {

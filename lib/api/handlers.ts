@@ -49,8 +49,8 @@ export interface HandlerEnv {
   notifier: Notifier;
 }
 
-/** Token lifetime; games themselves are deleted after 24 hours. */
-export const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+/** Token lifetime: 24 hours, the maximum the project allows (games themselves are deleted after 24 hours). */
+export const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const CREATE_ATTEMPTS = 5;
 
 const unauthorized = () => new ApiError(401, "UNAUTHORIZED");

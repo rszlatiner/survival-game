@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createGame } from "@/lib/client/api";
+import { clearSession, listSessions, type StoredHostSession } from "@/lib/client/storage";
 import { ROUNDS } from "@/lib/config";
 import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/api/parse";
 import type { GameLength } from "@/lib/types";
@@ -27,6 +28,10 @@ export function CreateGame({ readiness }: { readiness: UnitReadiness[] }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState<string | null>(null);
+  const [saved, setSaved] = useState<StoredHostSession[]>([]);
+
+  // Read after mount: localStorage does not exist during server rendering.
+  useEffect(() => setSaved(listSessions()), []);
 
   const info = (u: number) => readiness.find((r) => r.unit === u);
   const notReady = units.filter((u) => !(info(u)?.ready ?? false)).sort((a, b) => a - b);
@@ -102,6 +107,32 @@ export function CreateGame({ readiness }: { readiness: UnitReadiness[] }) {
   return (
     <main className="mx-auto min-h-screen max-w-2xl bg-slate-950 p-4 text-white">
       <h1 className="mb-4 text-3xl font-bold">New game</h1>
+      {saved.length > 0 && (
+        <section aria-label="Resume your game" className="mb-5 space-y-2 rounded-xl bg-slate-900 p-3">
+          <h2 className="font-bold">Resume your game</h2>
+          <ul className="space-y-2">
+            {saved.map((s) => (
+              <li key={s.code} className="flex items-center justify-between gap-2">
+                <a href={`/host/${s.code}`} className="rounded-lg bg-sky-600 px-4 py-2 font-mono text-xl font-bold tracking-widest">
+                  {s.code}
+                </a>
+                <button
+                  type="button"
+                  aria-label={`Remove ${s.code} from this list`}
+                  onClick={() => {
+                    clearSession(s.code);
+                    setSaved(listSessions());
+                  }}
+                  className="rounded-lg bg-slate-700 px-3 py-2"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <p className="mb-4 text-sm text-slate-300">Always open the game from the same web address so your login is remembered.</p>
       <form onSubmit={onSubmit} className="space-y-5" noValidate>
         <div>
           <label htmlFor="pw" className="block font-bold">Teacher password</label>

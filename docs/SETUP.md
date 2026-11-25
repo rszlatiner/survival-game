@@ -140,7 +140,7 @@ If the top teams are level on Survival Points and on total stock (or two teams c
 
 ### Lost your host login
 
-If you close the tab, refresh, or use another laptop, open `<URL>/host/<CODE>`. If the browser is not signed in as host it shows a Sign in again form: enter the teacher password and you take control again. The game state is stored on the server, so nothing is lost. A host sign-in lasts 12 hours.
+If you close the tab, refresh, or use another laptop, open `<URL>/host/<CODE>`. If the browser is not signed in as host it shows a Sign in again form: enter the teacher password and you take control again. The game state is stored on the server, so nothing is lost. A host sign-in lasts 24 hours. The New game page lists games this browser is still signed in to under "Resume your game". Always open the game from the same web address (the stored login belongs to that address).
 
 ### Quick versus standard
 

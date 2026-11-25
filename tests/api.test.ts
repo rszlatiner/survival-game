@@ -5,13 +5,14 @@ import {
   hostActionHandler,
   hostLoginHandler,
   joinHandler,
+  TOKEN_TTL_MS,
   stateHandler,
   teamActionHandler,
   teamSuggestionsHandler,
   type HandlerEnv,
 } from "@/lib/api/handlers";
 import { parseCreateBody, parseHostAction, parseLoginBody, parseTeamAction } from "@/lib/api/parse";
-import { signToken } from "@/lib/auth";
+import { signToken, verifyToken } from "@/lib/auth";
 import { ROUNDS } from "@/lib/config";
 import { checkWinner } from "@/lib/engine/win";
 import { memoryRepo } from "@/lib/repo/memory";
@@ -567,6 +568,16 @@ describe("host login", () => {
     expect((s as ApiError).status).toBe(400);
     const ok = await hostActionHandler(repo, env, code, hostToken, { type: "end" }, T0 + 1000);
     expect(ok.phase).toBe("finished");
+  });
+
+  it("token lifetime is 24 hours (the maximum allowed) and host login tokens last that long", async () => {
+    expect(TOKEN_TTL_MS).toBe(24 * 60 * 60 * 1000);
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code } = await newGame(repo, env);
+    const { hostToken } = await hostLoginHandler(repo, env, code, PASSWORD, T0);
+    expect(verifyToken(hostToken, env.tokenSecret, T0 + 23 * 3600 * 1000)).not.toBeNull();
+    expect(verifyToken(hostToken, env.tokenSecret, T0 + TOKEN_TTL_MS + 1)).toBeNull();
   });
 
   it("a wrong password gets the same 401 as create", async () => {

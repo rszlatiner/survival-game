@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useGameState, type GameStatus } from "@/lib/client/useGameState";
 import type { ChannelFactory, ChannelStatus } from "@/lib/client/realtime";
 import type { PublicGameState } from "@/lib/engine/public";
-import { ClientApiError, hostLogin, joinGame, postHost, postTeam } from "@/lib/client/api";
-import { clearSession, getDeviceId, loadSession, saveSession } from "@/lib/client/storage";
+import { ClientApiError, fetchState, createGame, hostLogin, joinGame, postHost, postTeam } from "@/lib/client/api";
+import { SESSION_TTL_MS, clearSession, getDeviceId, listSessions, loadSession, saveSession } from "@/lib/client/storage";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -262,7 +262,7 @@ describe("useGameState", () => {
 describe("storage", () => {
   it("round-trips a session and clears it", () => {
     saveSession("ABCDEF", { token: "t", role: "team", deviceId: "d", teamId: "x" });
-    expect(loadSession("ABCDEF")).toEqual({ token: "t", role: "team", deviceId: "d", teamId: "x" });
+    expect(loadSession("ABCDEF")).toMatchObject({ token: "t", role: "team", deviceId: "d", teamId: "x" });
     clearSession("ABCDEF");
     expect(loadSession("ABCDEF")).toBeNull();
   });
@@ -301,6 +301,8 @@ describe("storage", () => {
 });
 
 describe("api", () => {
+  afterEach(() => clearSession("ABCDEF"));
+
   it("attaches the stored token to host and team posts", async () => {
     saveSession("ABCDEF", { token: "HOSTTOK", role: "host", deviceId: "d" });
     fetchMock.mockResolvedValue(ok(st(2)));
@@ -319,6 +321,33 @@ describe("api", () => {
     expect(err.status).toBe(401);
     expect(err.code).toBe("UNAUTHORIZED");
     expect(loadSession("ABCDEF")).toBeNull();
+  });
+
+  it.each([500, 502, 503, 404, 403, 429])("keeps the stored session on a %i from an authenticated request", async (status) => {
+    saveSession("ABCDEF", { token: "T", role: "host", deviceId: "d" });
+    fetchMock.mockResolvedValue(fail(status, { error: "INTERNAL" }));
+    const err = await postHost("ABCDEF", { type: "next" }).catch((e) => e);
+    expect(err.status).toBe(status);
+    expect(loadSession("ABCDEF")?.token).toBe("T");
+  });
+
+  it("keeps the stored session on a network error and on a non-JSON 502", async () => {
+    saveSession("ABCDEF", { token: "T", role: "host", deviceId: "d" });
+    fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+    await expect(postHost("ABCDEF", { type: "next" })).rejects.toThrow("Failed to fetch");
+    expect(loadSession("ABCDEF")?.token).toBe("T");
+    fetchMock.mockResolvedValue({ ok: false, status: 502, json: async () => { throw new Error("html"); } } as unknown as Response);
+    await postHost("ABCDEF", { type: "next" }).catch(() => {});
+    expect(loadSession("ABCDEF")?.token).toBe("T");
+  });
+
+  it("a 401 on the public state fetch never clears a stored session", async () => {
+    saveSession("ABCDEF", { token: "T", role: "host", deviceId: "d" });
+    fetchMock.mockResolvedValue(fail(401, { error: "UNAUTHORIZED" }));
+    await fetchState("ABCDEF").catch(() => {});
+    fetchMock.mockRejectedValue(new TypeError("offline"));
+    await fetchState("ABCDEF").catch(() => {});
+    expect(loadSession("ABCDEF")?.token).toBe("T");
   });
 
   it("does not call the server without a matching session", async () => {
@@ -341,7 +370,7 @@ describe("api", () => {
     await joinGame("ABCDEF", { teamName: "Crabs" });
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body).toEqual({ teamName: "Crabs", deviceId: getDeviceId() });
-    expect(loadSession("ABCDEF")).toEqual({ token: "TT", role: "team", deviceId: getDeviceId(), teamId: "t9" });
+    expect(loadSession("ABCDEF")).toMatchObject({ token: "TT", role: "team", deviceId: getDeviceId(), teamId: "t9" });
   });
 });
 
@@ -363,5 +392,81 @@ describe("hostLogin", () => {
     expect(err).toBeInstanceOf(ClientApiError);
     expect(err.code).toBe("UNAUTHORIZED");
     expect(loadSession("ABCDEF")).toBeNull();
+  });
+});
+
+describe("listSessions", () => {
+  const NOW = 1_800_000_000_000;
+  const clearAll = () => {
+    for (const c of ["ABCDEF", "BCDEFG", "CDEFGH", "DEFGHJ", "BADBAD", "OLDOLD", "LEGACY"]) clearSession(c);
+    localStorage.clear();
+  };
+  beforeEach(clearAll);
+  afterEach(clearAll);
+
+  it("saveSession stamps createdAt and an expiry 24 hours ahead", () => {
+    expect(SESSION_TTL_MS).toBe(24 * 60 * 60 * 1000);
+    const t = Date.now();
+    saveSession("ABCDEF", { token: "t", role: "host", deviceId: "d" });
+    const s = loadSession("ABCDEF")!;
+    expect(s.createdAt).toBeGreaterThanOrEqual(t);
+    expect(s.expiresAt! - s.createdAt!).toBe(SESSION_TTL_MS);
+  });
+
+  it("lists valid unexpired host sessions, newest first, and skips team sessions", () => {
+    saveSession("ABCDEF", { token: "a", role: "host", deviceId: "d", createdAt: NOW - 5000, expiresAt: NOW + 1000 });
+    saveSession("BCDEFG", { token: "b", role: "host", deviceId: "d", createdAt: NOW - 1000, expiresAt: NOW + 9000 });
+    saveSession("CDEFGH", { token: "c", role: "team", deviceId: "d", teamId: "t", createdAt: NOW, expiresAt: NOW + 9000 });
+    expect(listSessions(NOW)).toEqual([
+      { code: "BCDEFG", createdAt: NOW - 1000, expiresAt: NOW + 9000 },
+      { code: "ABCDEF", createdAt: NOW - 5000, expiresAt: NOW + 1000 },
+    ]);
+  });
+
+  it("filters out expired sessions (expiry boundary included)", () => {
+    saveSession("OLDOLD", { token: "o", role: "host", deviceId: "d", createdAt: NOW - 99999, expiresAt: NOW - 1 });
+    saveSession("ABCDEF", { token: "a", role: "host", deviceId: "d", createdAt: NOW - 99999, expiresAt: NOW });
+    expect(listSessions(NOW)).toEqual([]);
+  });
+
+  it("still lists a legacy host session saved without an expiry", () => {
+    localStorage.setItem("dim:session:LEGACY", JSON.stringify({ token: "t", role: "host", deviceId: "d" }));
+    expect(listSessions(NOW)).toEqual([{ code: "LEGACY" }]);
+    expect(loadSession("LEGACY")?.token).toBe("t");
+  });
+
+  it("ignores garbage JSON, wrong shapes, bad keys and non-session keys", () => {
+    localStorage.setItem("dim:session:BADBAD", "{not json");
+    localStorage.setItem("dim:session:ABCDEF", JSON.stringify({ token: 5, role: "host", deviceId: "d" }));
+    localStorage.setItem("dim:session:BCDEFG", JSON.stringify({ token: "t", role: "host", deviceId: "d", expiresAt: "soon" }));
+    localStorage.setItem("dim:session:bad code!", JSON.stringify({ token: "t", role: "host", deviceId: "d" }));
+    localStorage.setItem("dim:session:CDEFGH", "null");
+    localStorage.setItem("dim:device", "abc");
+    localStorage.setItem("other", "{}");
+    expect(listSessions(NOW)).toEqual([]);
+  });
+
+  it("works from the memory fallback when localStorage throws", () => {
+    const boom = () => {
+      throw new Error("denied");
+    };
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(boom);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(boom);
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(boom);
+    vi.spyOn(Storage.prototype, "key").mockImplementation(boom);
+    saveSession("DEFGHJ", { token: "t", role: "host", deviceId: "d", createdAt: NOW, expiresAt: NOW + 5 });
+    expect(listSessions(NOW)).toEqual([{ code: "DEFGHJ", createdAt: NOW, expiresAt: NOW + 5 }]);
+    clearSession("DEFGHJ");
+    expect(listSessions(NOW)).toEqual([]);
+    vi.restoreAllMocks();
+  });
+
+  it("never stores the teacher password", async () => {
+    fetchMock.mockResolvedValue(ok({ hostToken: "NEWTOK" }));
+    await hostLogin("ABCDEF", "s3cret-pw");
+    fetchMock.mockResolvedValue(ok({ code: "BCDEFG", hostToken: "T2" }));
+    await createGame({ password: "s3cret-pw", units: [1], length: "quick", timerSeconds: 90 });
+    const all = Array.from({ length: localStorage.length }, (_, i) => localStorage.getItem(localStorage.key(i)!));
+    expect(all.join("|")).not.toContain("s3cret-pw");
   });
 });

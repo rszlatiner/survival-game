@@ -11,6 +11,19 @@ export interface Session {
   teamId?: string;
   /** Join-order index of this device on its team (captain is `captainIndex`). */
   deviceIndex?: number;
+  /** When this session was saved (ms since epoch). Absent on sessions saved by older versions. */
+  createdAt?: number;
+  /** When the server token expires (ms since epoch). Absent on sessions saved by older versions. */
+  expiresAt?: number;
+}
+
+/** Server token lifetime (lib/api/handlers TOKEN_TTL_MS); the stored expiry is derived from it. */
+export const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+
+export interface StoredHostSession {
+  code: string;
+  createdAt?: number;
+  expiresAt?: number;
 }
 
 const PREFIX = "dim:session:";
@@ -37,7 +50,9 @@ function isSession(x: unknown): x is Session {
     typeof o.deviceId === "string" &&
     o.deviceId.length > 0 &&
     (o.teamId === undefined || typeof o.teamId === "string") &&
-    (o.deviceIndex === undefined || (typeof o.deviceIndex === "number" && Number.isInteger(o.deviceIndex)))
+    (o.deviceIndex === undefined || (typeof o.deviceIndex === "number" && Number.isInteger(o.deviceIndex))) &&
+    (o.createdAt === undefined || (typeof o.createdAt === "number" && Number.isFinite(o.createdAt))) &&
+    (o.expiresAt === undefined || (typeof o.expiresAt === "number" && Number.isFinite(o.expiresAt)))
   );
 }
 
@@ -62,7 +77,9 @@ function write(key: string, value: string): void {
 }
 
 export function saveSession(code: string, session: Session): void {
-  write(keyFor(code), JSON.stringify(session));
+  const createdAt = session.createdAt ?? Date.now();
+  const stamped: Session = { ...session, createdAt, expiresAt: session.expiresAt ?? createdAt + SESSION_TTL_MS };
+  write(keyFor(code), JSON.stringify(stamped));
 }
 
 export function loadSession(code: string): Session | null {
@@ -84,6 +101,44 @@ export function clearSession(code: string): void {
   } catch {
     // nothing more to do
   }
+}
+
+function storedKeys(): string[] {
+  const keys = new Set<string>();
+  for (const k of memory.keys()) if (k.startsWith(PREFIX)) keys.add(k);
+  try {
+    const s = ls();
+    if (s) {
+      for (let i = 0; i < s.length; i++) {
+        const k = s.key(i);
+        if (k && k.startsWith(PREFIX)) keys.add(k);
+      }
+    }
+  } catch {
+    // memory keys are enough
+  }
+  return [...keys];
+}
+
+/**
+ * Stored host sessions that have not passed their expiry, newest first. Team
+ * sessions, malformed entries and expired entries are skipped. Entries saved
+ * before expiry was stored (no expiresAt) are kept: the server decides.
+ */
+export function listSessions(now: number = Date.now()): StoredHostSession[] {
+  const out: StoredHostSession[] = [];
+  for (const key of storedKeys()) {
+    const code = key.slice(PREFIX.length);
+    if (!/^[A-Z2-9]{6}$/.test(code)) continue;
+    const s = loadSession(code);
+    if (!s || s.role !== "host") continue;
+    if (s.expiresAt !== undefined && s.expiresAt <= now) continue;
+    const e: StoredHostSession = { code };
+    if (s.createdAt !== undefined) e.createdAt = s.createdAt;
+    if (s.expiresAt !== undefined) e.expiresAt = s.expiresAt;
+    out.push(e);
+  }
+  return out.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 }
 
 function randomId(): string {
