@@ -1,8 +1,8 @@
 /**
  * Unit 5 bank: angles.
  * Original templates written for this game. Difficulty 1 = one angle fact
- * (straight line, point, triangle, quadrilateral, opposite angles, naming);
- * 2 = two-step or reasoned use of a fact (isosceles, parallel lines, exterior
+ * (straight line, point, triangle, quadrilateral, naming, regular exterior);
+ * 2 = two-step or reasoned use of a fact (isosceles, polygon sums, parallel lines, exterior
  * angle, clock hands); 3 = multi-step reasoning with algebra, ratio or checking
  * a claim. There are no figures, so every angle relationship is stated in
  * words. All answers are whole numbers of degrees or a named choice.
@@ -88,20 +88,6 @@ export const UNIT_05: QuestionTemplate[] = [
       `The angles of a triangle add up to 180${DEG}. ${a} + ${b} = ${a + b}, so the third angle is 180 ${M} ${a + b} = ${180 - a - b}${DEG}.`,
   },
   {
-    id: "u05-opposite-01",
-    unit: 5,
-    difficulty: 1,
-    resource: "stone",
-    format: INT,
-    params: (rng) => ({ a: int(rng, 20, 160) }),
-    prompt: ({ a }, zone) =>
-      `Two straight ${Z[zone].rope} lines cross at a point. One of the four angles they make is ${a}${DEG}. ` +
-      `What is the angle directly opposite it?`,
-    expected: ({ a }) => a,
-    solution: ({ a }) =>
-      `Vertically opposite angles (the ones directly across from each other at a crossing) are equal, so the angle is ${a}${DEG}.`,
-  },
-  {
     id: "u05-classify-01",
     unit: 5,
     difficulty: 1,
@@ -135,6 +121,21 @@ export const UNIT_05: QuestionTemplate[] = [
       `The angles of a quadrilateral add up to 360${DEG}. ${a} + ${b} + ${c} = ${a + b + c}, so the fourth angle is 360 ${M} ${a + b + c} = ${360 - a - b - c}${DEG}.`,
   },
 
+  {
+    id: "u05-exterior-regular-01",
+    unit: 5,
+    difficulty: 1,
+    resource: "stone",
+    format: INT,
+    params: (rng) => ({ n: pick(rng, [5, 6, 8, 9, 10, 12, 15, 18, 20]) }),
+    prompt: ({ n }, zone) =>
+      `A ring of ${n} equal ${Z[zone].stone} is laid as a regular ${n}-sided shape. The outside (exterior) angles of any polygon add up to 360${DEG}. ` +
+      `How many degrees is one exterior angle of this shape?`,
+    expected: ({ n }) => 360 / n,
+    solution: ({ n }) =>
+      `A regular shape has ${n} equal exterior angles that total 360${DEG}, so each is 360 ÷ ${n} = ${360 / n}${DEG}.`,
+  },
+
   // ---------------- Difficulty 2 ----------------
   {
     id: "u05-isosceles-base-01",
@@ -150,20 +151,6 @@ export const UNIT_05: QuestionTemplate[] = [
     solution: ({ a }) =>
       `The three angles add up to 180${DEG}, so the two base angles share 180 ${M} ${a} = ${180 - a}${DEG}. ` +
       `They are equal, so each is ${180 - a} ÷ 2 = ${(180 - a) / 2}${DEG}.`,
-  },
-  {
-    id: "u05-isosceles-apex-01",
-    unit: 5,
-    difficulty: 2,
-    resource: "stone",
-    format: INT,
-    params: (rng) => ({ b: int(rng, 25, 80) }),
-    prompt: ({ b }, zone) =>
-      `A tent flap ${Z[zone].place} is an isosceles triangle whose two equal angles are each ${b}${DEG}. ` +
-      `What is the third angle, in degrees?`,
-    expected: ({ b }) => 180 - 2 * b,
-    solution: ({ b }) =>
-      `The two equal angles total 2 × ${b} = ${2 * b}${DEG}. The three angles add up to 180${DEG}, so the third is 180 ${M} ${2 * b} = ${180 - 2 * b}${DEG}.`,
   },
   {
     id: "u05-cointerior-01",
@@ -240,7 +227,7 @@ export const UNIT_05: QuestionTemplate[] = [
     format: INT,
     params: (rng) => ({ a: int(rng, 25, 55), b: int(rng, 25, 55), c: int(rng, 25, 55) }),
     prompt: ({ a, b, c }, zone) =>
-      `Four of the ${Z[zone].wood} lean against a straight beam, making four angles that fill one side of the beam. ` +
+      `Three ${Z[zone].wood} lean against a straight beam, all touching it at one point, so four angles fill one side of the beam. ` +
       `Three of the angles are ${a}${DEG}, ${b}${DEG} and ${c}${DEG}. What is the fourth angle?`,
     expected: ({ a, b, c }) => 180 - a - b - c,
     solution: ({ a, b, c }) =>
@@ -264,6 +251,20 @@ export const UNIT_05: QuestionTemplate[] = [
     solution: ({ x, a, c }) =>
       `The four angles add up to 360${DEG}. The two known angles total ${a} + ${c} = ${a + c}${DEG}, leaving 360 ${M} ${a + c} = ${360 - a - c}${DEG} for the equal pair. ` +
       `Each is ${360 - a - c} ÷ 2 = ${x}${DEG}.`,
+  },
+
+  {
+    id: "u05-polygon-sum-01",
+    unit: 5,
+    difficulty: 2,
+    resource: "water",
+    format: INT,
+    params: (rng) => ({ n: int(rng, 5, 10) }),
+    prompt: ({ n }, zone) =>
+      `A fence ${Z[zone].place} has ${n} straight sides and ${n} corners. What do the ${n} inside (interior) angles of the fence add up to, in degrees?`,
+    expected: ({ n }) => (n - 2) * 180,
+    solution: ({ n }) =>
+      `Draw lines from one corner to the others to split the shape into ${n - 2} triangles. Each triangle has angles totalling 180${DEG}, so ${n - 2} ${"×"} 180 = ${(n - 2) * 180}${DEG}.`,
   },
 
   // ---------------- Difficulty 3 ----------------
@@ -307,24 +308,6 @@ export const UNIT_05: QuestionTemplate[] = [
       `So x = ${x}. The angles are ${p * x + q}${DEG} and ${r * x + s}${DEG}, and the larger is ${Math.max(p * x + q, r * x + s)}${DEG}.`,
   },
   {
-    id: "u05-quad-steps-01",
-    unit: 5,
-    difficulty: 3,
-    resource: "water",
-    format: INT,
-    params(rng) {
-      const d = 2 * int(rng, 5, 10);
-      return { d, x: 90 - (3 * d) / 2 };
-    },
-    prompt: ({ d }, zone) =>
-      `The four angles of a quadrilateral ${Z[zone].place} grow in equal steps of ${d}${DEG}, from the smallest angle to the next, and so on up to the largest. ` +
-      `What is the largest angle, in degrees?`,
-    expected: ({ d, x }) => x + 3 * d,
-    solution: ({ d, x }) =>
-      `Call the smallest angle x. The angles are x, x + ${d}, x + ${2 * d}, x + ${3 * d}, and they total 360${DEG}, so 4x + ${6 * d} = 360 and 4x = ${360 - 6 * d}. ` +
-      `So x = ${x}${DEG} and the largest is ${x} + ${3 * d} = ${x + 3 * d}${DEG}.`,
-  },
-  {
     id: "u05-parallel-triangle-01",
     unit: 5,
     difficulty: 3,
@@ -363,25 +346,38 @@ export const UNIT_05: QuestionTemplate[] = [
       `So: ${["Yes, they can form a triangle", "No, the angles add up to more than 180°", "No, the angles add up to less than 180°"][t]}.`,
   },
   {
-    id: "u05-pentagon-01",
+    id: "u05-regular-interior-01",
     unit: 5,
     difficulty: 3,
-    resource: "wood",
+    resource: "food",
+    format: INT,
+    params: (rng) => ({ n: pick(rng, [5, 6, 8, 9, 10, 12]) }),
+    prompt: ({ n }, zone) =>
+      `A regular ${n}-sided pen ${Z[zone].place} has all its sides and angles equal. How many degrees is one inside (interior) angle? Type the number only.`,
+    expected: ({ n }) => 180 - 360 / n,
+    solution: ({ n }) =>
+      `The ${n} equal outside angles total 360${DEG}, so each is 360 ÷ ${n} = ${360 / n}${DEG}. An inside angle and its outside angle lie on a straight line, so 180 ${M} ${360 / n} = ${180 - 360 / n}${DEG}.`,
+  },
+  {
+    id: "u05-polygon-missing-01",
+    unit: 5,
+    difficulty: 3,
+    resource: "stone",
     format: INT,
     params(rng) {
-      for (let i = 0; i < 60; i++) {
-        const [a, b, c, d] = [0, 1, 2, 3].map(() => int(rng, 90, 125));
-        const x = 540 - a - b - c - d;
-        if (x >= 60 && x <= 150) return { a, b, c, d };
+      const n = pick(rng, [5, 6]);
+      for (let i = 0; i < 80; i++) {
+        const known = Array.from({ length: n - 1 }, () => int(rng, 95, 140));
+        const last = (n - 2) * 180 - known.reduce((s, v) => s + v, 0);
+        if (last >= 70 && last <= 165) return { n, a: known[0], b: known[1], c: known[2], d: known[3], e: n === 6 ? known[4] : 0 };
       }
-      return { a: 105, b: 110, c: 100, d: 115 };
+      return n === 5 ? { n, a: 105, b: 110, c: 100, d: 115, e: 0 } : { n, a: 120, b: 125, c: 118, d: 122, e: 119 };
     },
-    prompt: ({ a, b, c, d }, zone) =>
-      `A five-sided fence ${Z[zone].place} has angles of ${a}${DEG}, ${b}${DEG}, ${c}${DEG} and ${d}${DEG} at four corners. ` +
-      `The five angles of a pentagon add up to 540${DEG}. What is the angle at the fifth corner?`,
-    expected: ({ a, b, c, d }) => 540 - a - b - c - d,
-    solution: ({ a, b, c, d }) =>
-      `Add the four known angles: ${a} + ${b} + ${c} + ${d} = ${a + b + c + d}. ` +
-      `Take that from 540: 540 ${M} ${a + b + c + d} = ${540 - a - b - c - d}${DEG}.`,
+    prompt: ({ n, a, b, c, d, e }, zone) =>
+      `A ${n}-sided plot ${Z[zone].place} has ${n - 1} known corner angles: ${[a, b, c, d, ...(n === 6 ? [e] : [])].map((v) => `${v}${DEG}`).join(", ")}. What is the angle at the last corner?`,
+    expected: ({ n, a, b, c, d, e }) => (n - 2) * 180 - a - b - c - d - e,
+    solution: ({ n, a, b, c, d, e }) =>
+      `A ${n}-sided shape splits into ${n - 2} triangles, so its angles total ${n - 2} ${"×"} 180 = ${(n - 2) * 180}${DEG}. ` +
+      `The known angles total ${a + b + c + d + e}, so the last is ${(n - 2) * 180} ${M} ${a + b + c + d + e} = ${(n - 2) * 180 - a - b - c - d - e}${DEG}.`,
   },
 ];

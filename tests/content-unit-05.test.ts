@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_05 } from "@/content/units/unit-05";
-import { bankChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { rankChecks } from "./helpers/rank";
 
 bankChecks(5, UNIT_05);
+overlapChecks(UNIT_05);
+coordinateChecks(UNIT_05);
+rankChecks(UNIT_05);
 
 const get = (id: string) => UNIT_05.find((t) => t.id === id)!;
 
@@ -14,7 +18,6 @@ describe("unit 5 independent recompute", () => {
   it("straight-line-01", () => run("u05-straight-line-01", (p, e) => expect(Number(e) + numsIn(p)[0]).toBe(180)));
   it("at-point-01", () => run("u05-at-point-01", (p, e) => expect(numsIn(p).reduce((s, v) => s + v, Number(e))).toBe(360)));
   it("triangle-third-01", () => run("u05-triangle-third-01", (p, e) => expect(numsIn(p).reduce((s, v) => s + v, Number(e))).toBe(180)));
-  it("opposite-01", () => run("u05-opposite-01", (p, e) => expect(e).toBe(numsIn(p)[0])));
   it("classify-01: the name matches the angle's range", () =>
     run("u05-classify-01", (p, e, opts) => {
       const a = numsIn(p)[0];
@@ -24,7 +27,6 @@ describe("unit 5 independent recompute", () => {
     }));
   it("quad-fourth-01", () => run("u05-quad-fourth-01", (p, e) => expect(numsIn(p).reduce((s, v) => s + v, Number(e))).toBe(360)));
   it("isosceles-base-01", () => run("u05-isosceles-base-01", (p, e) => expect(numsIn(p)[0] + 2 * Number(e)).toBe(180)));
-  it("isosceles-apex-01", () => run("u05-isosceles-apex-01", (p, e) => expect(2 * numsIn(p)[0] + Number(e)).toBe(180)));
   it("cointerior-01", () => run("u05-cointerior-01", (p, e) => expect(numsIn(p)[0] + Number(e)).toBe(180)));
   it("reason-01: given sizes agree with the rule named, and the other rules are false for those sizes or positions", () =>
     run("u05-reason-01", (p, e, opts, where) => {
@@ -74,12 +76,6 @@ describe("unit 5 independent recompute", () => {
       expect(found).toBeGreaterThan(0);
       expect(e).toBe(Math.max(p1 * found + q, r1 * found + s));
     }));
-  it("quad-steps-01", () =>
-    run("u05-quad-steps-01", (p, e) => {
-      const d = numsIn(p)[0];
-      const big = Number(e);
-      expect(big + (big - d) + (big - 2 * d) + (big - 3 * d)).toBe(360);
-    }));
   it("parallel-triangle-01", () =>
     run("u05-parallel-triangle-01", (p, e) => {
       const m = /DAB is (\d+)° and angle EAC is (\d+)°/.exec(p)!;
@@ -92,8 +88,27 @@ describe("unit 5 independent recompute", () => {
       const want = sum === 180 ? "Yes" : sum > 180 ? "No, the angles add up to more" : "No, the angles add up to less";
       expect(String(e).startsWith(want), where).toBe(true);
     }));
-  it("pentagon-01", () => run("u05-pentagon-01", (p, e) => {
-    const four = numsIn(p.replace("five-sided", "five sided")).slice(0, 4);
-    expect(four.reduce((s, v) => s + v, Number(e))).toBe(540);
-  }));
+  it("exterior-regular-01", () =>
+    run("u05-exterior-regular-01", (p, e) => {
+      const n = numsIn(p)[0];
+      expect(Number(e) * n).toBe(360);
+    }));
+  it("polygon-sum-01: the angle total of an n-sided polygon, from n - 2 triangles", () =>
+    run("u05-polygon-sum-01", (p, e) => {
+      const n = numsIn(p)[0];
+      expect(e).toBe(180 * n - 360);
+    }));
+  it("regular-interior-01: interior plus exterior is a straight line and n exteriors make a full turn", () =>
+    run("u05-regular-interior-01", (p, e) => {
+      const n = numsIn(p)[0];
+      expect(Number(e) + 360 / n).toBe(180);
+      expect(Number(e) * n).toBe(180 * (n - 2));
+    }));
+  it("polygon-missing-01", () =>
+    run("u05-polygon-missing-01", (p, e) => {
+      const n = numsIn(p)[0];
+      const known = numsIn(p.slice(p.indexOf("known corner angles")).replace("known corner angles", ""));
+      expect(known).toHaveLength(n - 1);
+      expect(known.reduce((s, v) => s + v, Number(e))).toBe(180 * (n - 2));
+    }));
 });
