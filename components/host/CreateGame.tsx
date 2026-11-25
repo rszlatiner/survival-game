@@ -6,6 +6,7 @@ import { clearSession, listSessions, type StoredHostSession } from "@/lib/client
 import { ROUNDS } from "@/lib/config";
 import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/config";
 import type { GameLength } from "@/lib/types";
+import { UNIT_CATEGORIES } from "@/lib/unitMeta";
 import { hostErrorText } from "./labels";
 import { TIMER_PRESETS } from "./timerPresets";
 import { Palm, TimerIcon, TreasureMapBorder } from "@/components/art";
@@ -170,27 +171,52 @@ export function CreateGame({ readiness }: { readiness: UnitReadiness[] }) {
               None
             </button>
           </div>
-          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {UNITS.map((u) => {
-              const r = info(u);
-              const ready = r?.ready ?? false;
-              return (
-                <li key={u} className="flex min-h-12 items-center justify-between rounded-2xl border-2 border-sand-300 bg-white p-2 has-checked:border-ocean-700 has-checked:bg-ocean-100">
-                  <label className="flex items-center gap-2 font-bold">
-                    <input type="checkbox" checked={units.includes(u)} onChange={() => toggle(u)} className="h-6 w-6 accent-ocean-700" />
-                    <Palm size={26} className={units.includes(u) ? "" : "opacity-40 grayscale"} />
-                    <span>Unit {u}</span>
-                  </label>
-                  <span
-                    data-testid={`ready-${u}`}
-                    className={`px-2 py-0.5 text-sm font-bold text-white ${ready ? "bg-palm-700" : "bg-coral-600"}`}
+          {UNIT_CATEGORIES.map((cat) => {
+            const catUnits = cat.units.map((x) => x.unit);
+            const allOn = catUnits.every((u) => units.includes(u));
+            return (
+              <section key={cat.id} aria-label={cat.title} data-testid={`category-${cat.id}`} className="space-y-2 pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-black text-ocean-800">{cat.title}</h3>
+                  <button
+                    type="button"
+                    aria-label={`${allOn ? "Clear" : "Select all"} ${cat.title} units`}
+                    onClick={() => {
+                      setConfirming(false);
+                      setUnits((cur) => (allOn ? cur.filter((u) => !catUnits.includes(u)) : [...new Set([...cur, ...catUnits])]));
+                    }}
+                    className={btn("sand", "min-h-9 px-2 text-sm")}
                   >
-                    {ready ? "Ready" : "Not ready"}{r ? ` (${r.count})` : ""}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+                    {allOn ? "Clear" : "Select all"}
+                  </button>
+                </div>
+                <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {cat.units.map(({ unit: u, name }) => {
+                    const r = info(u);
+                    const ready = r?.ready ?? false;
+                    return (
+                      <li key={u} className="flex min-h-12 items-center justify-between gap-2 rounded-2xl border-2 border-sand-300 bg-white p-2 has-checked:border-ocean-700 has-checked:bg-ocean-100">
+                        <label className="flex items-center gap-2 font-bold">
+                          <input type="checkbox" aria-label={`Unit ${u}`} checked={units.includes(u)} onChange={() => toggle(u)} className="h-6 w-6 shrink-0 accent-ocean-700" />
+                          <Palm size={26} className={units.includes(u) ? "" : "opacity-40 grayscale"} />
+                          <span>
+                            Unit {u}
+                            <span className="block text-sm font-semibold text-night-900/80">{name}</span>
+                          </span>
+                        </label>
+                        <span
+                          data-testid={`ready-${u}`}
+                          className={`shrink-0 px-2 py-0.5 text-sm font-bold text-white ${ready ? "bg-palm-700" : "bg-coral-600"}`}
+                        >
+                          {ready ? "Ready" : "Not ready"}{r ? ` (${r.count})` : ""}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
         </fieldset>
 
         <fieldset className="space-y-2">

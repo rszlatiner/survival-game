@@ -105,6 +105,23 @@ describe("resume list on the create page", () => {
     expect(screen.getByText("Always open the game from the same web address so your login is remembered.")).toBeTruthy();
   });
 
+  it("groups the units into subject categories with names", async () => {
+    const user = userEvent.setup();
+    render(<CreateGame readiness={readiness} />);
+    for (const title of ["Number", "Algebra", "Geometry and measure", "Statistics and probability"]) {
+      expect(screen.getByRole("region", { name: title })).toBeTruthy();
+    }
+    const stats = screen.getByRole("region", { name: "Statistics and probability" });
+    expect(within(stats).getByText("Probability")).toBeTruthy();
+    expect(within(stats).getAllByRole("checkbox")).toHaveLength(3);
+    const algebra = screen.getByRole("region", { name: "Algebra" });
+    expect(within(algebra).getByText("Graphs")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Select all Algebra units" }));
+    for (const n of [2, 4, 9, 10]) expect((screen.getByRole("checkbox", { name: `Unit ${n}` }) as HTMLInputElement).checked).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Clear Algebra units" }));
+    for (const n of [2, 4, 9, 10]) expect((screen.getByRole("checkbox", { name: `Unit ${n}` }) as HTMLInputElement).checked).toBe(false);
+  });
+
   it("shows nothing when there are no stored host sessions", () => {
     render(<CreateGame readiness={readiness} />);
     expect(screen.queryByText(/resume your game/i)).toBeNull();
