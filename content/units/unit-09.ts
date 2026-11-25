@@ -24,6 +24,36 @@ const co = (n: number) => (n === 1 ? "" : `${n}`);
 const andList = (xs: number[]) => `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 const firstFour = (a: number, d: number) => [a, a + d, a + 2 * d, a + 3 * d];
 
+/** The three-of-five choices used to keep different wrong options for different seeds. */
+const TRIPLES: number[][] = [];
+for (let i = 0; i < 5; i++) for (let j = i + 1; j < 5; j++) for (let k = j + 1; k < 5; k++) TRIPLES.push([i, j, k]);
+
+type RuleP = Record<string, number>;
+function ruleTerms({ kind, d, a, r }: RuleP): number[] {
+  return kind === 0
+    ? [a, a + d, a + 2 * d, a + 3 * d]
+    : kind === 3
+      ? [a, a * r, a * r * r, a * r * r * r]
+      : [a, a - d, a - 2 * d, a - 3 * d];
+}
+function ruleKey({ kind, d, r }: RuleP): string {
+  return kind === 0 ? `Add ${d}` : kind === 3 ? `Multiply by ${r}` : `Subtract ${d}`;
+}
+function rulePool({ kind, d, a, r }: RuleP): string[] {
+  if (kind === 0) return [`Add ${a}`, `Add ${d + 1}`, `Add ${d - 1}`, `Multiply by ${d}`, `Add ${a + d}`];
+  if (kind === 3) return [`Add ${a * r - a}`, `Multiply by ${r + 1}`, `Multiply by ${r - 1}`, `Add ${r}`, `Add ${a * r * r - a * r}`];
+  return [`Add ${d}`, `Subtract ${d + 1}`, `Subtract ${d - 1}`, `Subtract ${a}`, `Subtract ${a - d}`];
+}
+
+/** Six slips for "is this number in the sequence": none is a term, and none is a neighbour pair of the key. */
+function memberPool(d: number, c: number, k: number): number[] {
+  const t = d * k + c;
+  return [t + 2, t - 3, t + d - 1, t + c, d * (k + 1), d * k];
+}
+/** The 20 ways to keep three of the six slips. */
+const SIX_TRIPLES: number[][] = [];
+for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) for (let k = j + 1; k < 6; k++) SIX_TRIPLES.push([i, j, k]);
+
 export const UNIT_09: QuestionTemplate[] = [
   // ---------------- Difficulty 1 ----------------
   {
@@ -63,21 +93,32 @@ export const UNIT_09: QuestionTemplate[] = [
     resource: "stone",
     format: CHOICE,
     params: (rng) => {
-      const d = int(rng, 2, 8);
-      return { d, a: d + int(rng, 2, 10), drop: int(rng, 0, 3) };
+      // kind 0 add, 1 and 2 subtract (half the seeds fall), 3 multiply.
+      for (let i = 0; i < 100; i++) {
+        const kind = int(rng, 0, 3);
+        const d = int(rng, 3, 8);
+        const a = kind === 0 ? d + int(rng, 2, 10) : kind === 3 ? int(rng, 2, 5) : 3 * d + int(rng, 3, 12);
+        const r = int(rng, 3, 4);
+        const p = { kind, d, a, r, sel: int(rng, 0, 9) };
+        const all = [ruleKey(p), ...rulePool(p)];
+        if (new Set(all).size === all.length) return p;
+      }
+      return { kind: 0, d: 3, a: 8, r: 3, sel: 0 };
     },
-    prompt: ({ a, d }, zone) =>
-      `${Z[zone].Place}, the rows of your wall use ${andList(firstFour(a, d))} ${Z[zone].stone}, in that order. ` +
+    prompt: (p, zone) =>
+      `${Z[zone].Place}, the rows of your wall use ${andList(ruleTerms(p))} ${Z[zone].stone}, in that order. ` +
       `What is the term-to-term rule?`,
-    // Four wrong rules; one is left out by the seed so the wrong set varies.
-    options: ({ a, d, drop }) => [
-      `Add ${d}`,
-      ...[`Subtract ${d}`, `Multiply by ${d}`, `Add ${a}`, `Add ${d + 1}`].filter((_, i) => i !== drop),
-    ],
-    expected: ({ d }) => `Add ${d}`,
-    solution: ({ a, d }) =>
-      `Each term is ${d} more than the one before (${a + d} ${MINUS} ${a} = ${d}), so the rule is Add ${d}. ` +
-      `The rule must work between every pair of neighbours.`,
+    // Five slips (wrong gap, wrong first term, off by one, wrong sign); the seed keeps three of them.
+    options: (p) => [ruleKey(p), ...TRIPLES[p.sel].map((i) => rulePool(p)[i])],
+    expected: (p) => ruleKey(p),
+    solution: (p) => {
+      const t = ruleTerms(p);
+      return p.kind === 3
+        ? `Each term is ${p.r} times the one before (${t[1]} ${DIV} ${t[0]} = ${p.r}), so the rule is ${ruleKey(p)}. The rule must work between every pair of neighbours.`
+        : p.kind === 0
+          ? `Each term is ${p.d} more than the one before (${t[1]} ${MINUS} ${t[0]} = ${p.d}), so the rule is ${ruleKey(p)}. The rule must work between every pair of neighbours.`
+          : `Each term is ${p.d} less than the one before (${t[0]} ${MINUS} ${t[1]} = ${p.d}), so the rule is ${ruleKey(p)}. The rule must work between every pair of neighbours.`;
+    },
   },
   {
     id: "u09-nth-term-gen-01",
@@ -113,7 +154,7 @@ export const UNIT_09: QuestionTemplate[] = [
     difficulty: 1,
     resource: "wood",
     format: EXPR,
-    params: (rng) => ({ d: int(rng, 3, 9) }),
+    params: (rng) => ({ d: int(rng, 3, 19) }),
     prompt: ({ d }, zone) =>
       `${Z[zone].Place}, the numbers of ${Z[zone].wood} in your piles follow the sequence ${andList([d, 2 * d, 3 * d, 4 * d])}. ` +
       `Write an expression, in terms of n, for the n-th term.`,
@@ -289,15 +330,25 @@ export const UNIT_09: QuestionTemplate[] = [
     resource: "wood",
     format: CHOICE,
     params: (rng) => {
-      const d = int(rng, 4, 9);
-      return { d, c: int(rng, 2, d - 2), k: int(rng, 5, 15), drop: int(rng, 0, 3) };
+      for (let i = 0; i < 100; i++) {
+        const d = int(rng, 5, 10);
+        const c = int(rng, 2, d - 2);
+        const k = int(rng, 5, 15);
+        const t = d * k + c;
+        const vals = [t, ...memberPool(d, c, k)];
+        const isTerm = (v: number) => v > c && (v - c) % d === 0;
+        if (new Set(vals).size === vals.length && vals.slice(1).every((v) => !isTerm(v) && v > 0)) {
+          return { d, c, k, sel: int(rng, 0, 19) };
+        }
+      }
+      return { d: 7, c: 3, k: 9, sel: 0 };
     },
     prompt: ({ d, c }, zone) =>
       `${Z[zone].Place}, the number of ${Z[zone].wood} in row n of a path is ${d}n + ${c}. ` +
       `Which of these could be the number in one of the rows?`,
-    options: ({ d, c, k, drop }) => {
-      const t = d * k + c;
-      return [`${t}`, ...[t + 1, t - 1, t + c, d * k].filter((_, i) => i !== drop).map(String)];
+    options: ({ d, c, k, sel }) => {
+      const pool = memberPool(d, c, k);
+      return [`${d * k + c}`, ...SIX_TRIPLES[sel].map((i) => `${pool[i]}`)];
     },
     expected: ({ d, c, k }) => `${d * k + c}`,
     solution: ({ d, c, k }) =>
@@ -346,13 +397,14 @@ export const UNIT_09: QuestionTemplate[] = [
     difficulty: 3,
     resource: "stone",
     format: EXPR,
-    params: (rng) => ({ c: int(rng, 1, 9) }),
-    prompt: ({ c }, zone) =>
-      `${Z[zone].Place}, the layers of a pyramid hold ${andList([1, 4, 9, 16].map((s) => s + c))} ${Z[zone].stone}. ` +
+    params: (rng) => ({ c: int(rng, 1, 25), a: int(rng, 1, 2) }),
+    prompt: ({ a, c }, zone) =>
+      `${Z[zone].Place}, the layers of a pyramid hold ${andList([1, 4, 9, 16].map((s) => a * s + c))} ${Z[zone].stone}. ` +
       `The gaps between terms are not equal. Write an expression, in terms of n, for layer n.`,
-    expected: ({ c }) => `n^2+${c}`,
-    solution: ({ c }) =>
-      `The square numbers are 1, 4, 9, 16. Each term is ${c} more than a square number, so the n-th term is n^2+${c}.`,
+    expected: ({ a, c }) => `${co(a)}n^2+${c}`,
+    solution: ({ a, c }) =>
+      `The square numbers are 1, 4, 9, 16. ${a === 1 ? `Each term is ${c} more than a square number` : `Each term is ${c} more than 2 times a square number`}, ` +
+      `so the n-th term is ${co(a)}n^2+${c}.`,
   },
   {
     id: "u09-chain-machine-03",

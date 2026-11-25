@@ -160,12 +160,41 @@ describe("unit 9 independent recompute", () => {
       [1, 2, 3, 4].forEach((n, i) => expect(at(String(e), "n", n)).toBe(t[i]));
       const d = t[1] - t[0];
       expect(isCorrect(`${d}n+${t[0] - d}`, e, format("u09-square-nth-03"))).toBe(false);
+      expect(isCorrect(`n^2+${t[0] - 1}`, e, format("u09-square-nth-03"))).toBe(t[1] - t[0] === 3);
     }));
   it("chain-machine-03: running the answer forwards gives the output", () =>
     run("u09-chain-machine-03", (p, e) => {
       const [a, b, c, s, out] = numsIn(p);
       expect(c * (a * Number(e) + b) - s).toBe(out);
     }));
+});
+
+describe("unit 9 keys are not guessable", () => {
+  it("term-rule-01: all three rule kinds are keys, and the key's number is not in every wrong option", () => {
+    const kinds = new Map<string, number>();
+    let repeatsAll = 0;
+    let n = 0;
+    eachQuestion(get("u09-term-rule-01"), ({ publicQ, expected }) => {
+      const key = String(expected);
+      kinds.set(key.split(" ")[0], (kinds.get(key.split(" ")[0]) ?? 0) + 1);
+      const num = numsIn(key)[0];
+      n++;
+      if (publicQ.options!.filter((o) => o !== key).every((o) => numsIn(o)[0] === num)) repeatsAll++;
+    });
+    expect([...kinds.keys()].sort()).toEqual(["Add", "Multiply", "Subtract"]);
+    expect((kinds.get("Subtract") ?? 0) / n).toBeGreaterThan(0.4);
+    expect(repeatsAll / n).toBeLessThan(0.05);
+  });
+  it("member-03: never both neighbours of the key, and the key's rank varies", () => {
+    const ranks = new Set<number>();
+    eachQuestion(get("u09-member-03"), ({ publicQ, expected }, where) => {
+      const vals = publicQ.options!.map(Number);
+      const key = Number(expected);
+      expect(vals.includes(key - 1) && vals.includes(key + 1), where).toBe(false);
+      ranks.add([...vals].sort((a, b) => a - b).indexOf(key));
+    });
+    expect(ranks.size).toBeGreaterThanOrEqual(3);
+  });
 });
 
 describe("unit 9 prompts read well in every zone", () => {
