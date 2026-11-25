@@ -8,7 +8,7 @@
  * problems, scaling edges, comparing solids, counting parts of a prism.
  * Solids and shapes are described with dimensions and counts, so no picture
  * is needed. Capacity: 1 litre = 1000 cm³. Typed answers are positive
- * whole numbers; every answer is exact.
+ * numbers (whole numbers except the cylinder volume, exact to 2 decimal places); every answer is exact.
  */
 import type { QuestionTemplate } from "@/lib/questions/types";
 import { int } from "@/lib/questions/random";
@@ -26,6 +26,8 @@ function mix(key: string, cands: string[], s: number): string[] {
   return pickSet(key, cands, [s % 4, Math.floor(s / 4) % 4, Math.floor(s / 16) % 4, Math.floor(s / 64) % 4], Math.floor(s / 256));
 }
 const SEL = (rng: () => number) => int(rng, 0, 256 * 1000 - 1);
+/** "a" or "an" before a number said aloud (8, 11, 18 take "an"). */
+const an = (n: number) => (/^(8|11|18)/.test(String(n)) ? "an" : "a");
 
 /** Faces, edges, vertices of common solids (each triple is different). */
 const SOLIDS: { name: string; f: number; e: number; v: number }[] = [
@@ -240,7 +242,7 @@ export const UNIT_14: QuestionTemplate[] = [
     difficulty: 2,
     resource: "stone",
     format: INT,
-    params: (rng) => ({ kind: int(rng, 0, 5), a: int(rng, 3, 9), b: int(rng, 10, 16), n: int(rng, 5, 9) }),
+    params: (rng) => ({ kind: int(rng, 0, 5), a: int(rng, 3, 9), b: int(rng, 12, 16), n: int(rng, 5, 9) }),
     prompt: ({ kind, a, b, n }, zone) =>
       `${Z[zone].Place}, you make a model. It is ` +
       [
@@ -309,7 +311,7 @@ export const UNIT_14: QuestionTemplate[] = [
       `How many lines of symmetry does it have, and what is its order of rotational symmetry?`,
     options: ({ t, s }) => {
       const { l, o } = SHAPES[t];
-      const pool = [sym(2, 2), sym(3, 3), sym(4, 4), sym(5, 5), sym(6, 6), sym(0, 2), sym(1, 1), sym(l, 1), sym(l, 2), sym(0, 1), sym(1, o)];
+      const pool = [sym(2, 2), sym(3, 3), sym(4, 4), sym(5, 5), sym(6, 6), sym(0, 2), sym(1, 1), sym(0, 1), sym(l, 1)];
       return mix(sym(l, o), pool, s);
     },
     expected: ({ t }) => sym(SHAPES[t].l, SHAPES[t].o),
@@ -331,8 +333,8 @@ export const UNIT_14: QuestionTemplate[] = [
       return { W, H, w: int(rng, 2, W - 3), h: int(rng, 2, H - 3), len: int(rng, 3, 10) };
     },
     prompt: ({ W, H, w, h, len }, zone) =>
-      `${Z[zone].Place}, a step block is a prism ${len} cm long. Its end face is an L-shape: a ${W} cm by ${H} cm rectangle ` +
-      `with a ${w} cm by ${h} cm rectangle removed from one corner. What is its volume in cm³?`,
+      `${Z[zone].Place}, a step block is a prism ${len} cm long. Its end face is an L-shape: ${an(W)} ${W} cm by ${H} cm rectangle ` +
+      `with ${an(w)} ${w} cm by ${h} cm rectangle removed from one corner. What is its volume in cm³?`,
     expected: ({ W, H, w, h, len }) => (W * H - w * h) * len,
     solution: ({ W, H, w, h, len }) =>
       `Area of the L-shaped end = ${W} × ${H} ${MINUS} ${w} × ${h} = ${W * H} ${MINUS} ${w * h} = ${W * H - w * h} cm². ` +

@@ -55,14 +55,22 @@ describe("unit 14 independent recompute", () => {
       else if (/m\u00b3 of space/.test(p)) expect(Number(e)).toBe(given * 1000000);
       else expect(Number(e) * 1000).toBe(given);
     }));
-  it("planes-sym-01", () =>
+  it("planes-sym-01: cuboid answers recomputed from the three dimensions", () =>
     run("u14-planes-sym-01", (p, e) => {
-      if (/square ends/.test(p)) expect(e).toBe(5);
-      else if (/cuboid \d+ cm by \d+ cm by/.test(p)) expect(e).toBe(3);
-      else if (/a cube/.test(p)) expect(e).toBe(9);
+      const cub = /square ends of side (\d+) cm and a length of (\d+) cm/.exec(p) ?? /cuboid (\d+) cm by (\d+) cm by (\d+) cm/.exec(p);
+      if (cub) {
+        const d = /square ends/.test(p) ? [Number(cub[1]), Number(cub[1]), Number(cub[2])] : [Number(cub[1]), Number(cub[2]), Number(cub[3])];
+        const distinct = new Set(d).size;
+        expect(e).toBe(distinct === 1 ? 9 : distinct === 2 ? 5 : 3);
+      } else if (/a cube/.test(p)) expect(e).toBe(9);
       else if (/pyramid/.test(p)) expect(e).toBe(4);
       else if (/equilateral/.test(p)) expect(e).toBe(4);
       else expect(e).toBe(Number(/with (\d+) sides/.exec(p)![1]) + 1);
+    }));
+  it("l-prism-01 uses the right article", () =>
+    run("u14-l-prism-01", (p) => {
+      expect(p).not.toMatch(/\ba (8|11|18) cm/);
+      expect(p).not.toMatch(/\ban (?!8|11|18)\d+ cm/);
     }));
   it("cylinder-vol-01", () =>
     run("u14-cylinder-vol-01", (p, e) => {
