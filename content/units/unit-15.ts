@@ -100,6 +100,7 @@ function conclusionTrue(o: string, v: number[]): boolean {
     case "Rose by the same amount each week": return steps.every((x) => x === steps[0]);
     case "Highest in week 1": return v[0] === Math.max(...v);
     case "Highest in week 2": return v[1] === Math.max(...v);
+    case "Highest in week 3": return v[2] === Math.max(...v);
     case "Highest in week 4": return v[3] === Math.max(...v);
     case "Lowest in week 4": return v[3] === Math.min(...v);
     case "Lowest in week 2": return v[1] === Math.min(...v);
@@ -112,10 +113,11 @@ function conclusionKey(kind: number, v: number[]): string {
   return kind === 0 ? "Rose every week" : kind === 1 ? "Fell every week" : "Highest in week 2";
 }
 
-/** Round percentages (5 to 100, not p) that a careless solver could give for a fall of p%. */
-function slipPercents(p: number): number[] {
+/** Round percentages (5 to 100, not p) that a careless solver could give for a fall of p%, including slips built from a wrong claim of tom%. */
+function slipPercents(p: number, tom = 0): number[] {
   const c = [100 - p, 2 * p, p / 2, p + 10, p - 10, p + 5, p - 5, 100 - p / 2, p + 20, p - 20, (100 * p) / (100 - p)];
-  return [...new Set(c)].filter((x) => Number.isInteger(x) && x >= 5 && x <= 100 && x !== p);
+  if (tom > 0) c.push(100 - tom, tom / 2, 2 * tom, tom + 10, tom - 10, (tom + p) / 2, Math.abs(tom - p) * 2);
+  return [...new Set(c)].filter((x) => Number.isInteger(x) && x >= 5 && x <= 100 && x !== p && x !== tom);
 }
 /** Tom's wrong figure: one of the slips, chosen by w. */
 function claimOf(p: number, w: number): number {
@@ -372,8 +374,8 @@ export const UNIT_15: QuestionTemplate[] = [
     prompt: (p, zone) => {
       const t = (v: number) => (v < 0 ? "-" : String(v));
       return (
-        `${Z[zone].Place}, two sites record daily counts of ${Z[zone].food}. Stem-and-leaf (stem 2, leaf 3 means 23). ` +
-        `${[1, 2, 3].map((st) => `${st}: A ${t(p[`a${st}`])}, B ${t(p[`b${st}`])}`).join(". ")}. What is the difference between the two medians?`
+        `${Z[zone].Place}, daily counts of ${Z[zone].food} at two sites. Stem-and-leaf (stem 2, leaf 3 means 23): ` +
+        `${[1, 2, 3].map((st) => `${st} | A: ${t(p[`a${st}`])} | B: ${t(p[`b${st}`])}`).join("; ")}. Difference between the medians?`
       );
     },
     expected: (p) => Math.abs(med5(groupOf(p, "a")) - med5(groupOf(p, "b"))),
@@ -462,7 +464,7 @@ export const UNIT_15: QuestionTemplate[] = [
       for (let i = 0; i < 100; i++) {
         const A = distinct(rng, 5, 15, 32);
         const B = distinct(rng, 5, 15, 32);
-        if (range(A) !== range(B)) return { a1: A[0], a2: A[1], a3: A[2], a4: A[3], a5: A[4], b1: B[0], b2: B[1], b3: B[2], b4: B[3], b5: B[4], s: SEL(rng) };
+        if (range(A) !== range(B)) return { a1: A[0], a2: A[1], a3: A[2], a4: A[3], a5: A[4], b1: B[0], b2: B[1], b3: B[2], b4: B[3], b5: B[4], s: SEL2(rng) };
       }
       return { a1: 20, a2: 21, a3: 22, a4: 23, a5: 24, b1: 16, b2: 20, b3: 22, b4: 26, b5: 30, s: 1 };
     },
@@ -476,7 +478,7 @@ export const UNIT_15: QuestionTemplate[] = [
       const other = better === "A" ? "B" : "A";
       const rBetter = Math.min(ra, rb);
       const rOther = Math.max(ra, rb);
-      return mix(`Way ${better}, range ${rBetter}`, [`Way ${other}, range ${rOther}`, `Way ${better}, range ${rOther}`, `Way ${other}, range ${rBetter}`], s);
+      return mix2(`Way ${better}, range ${rBetter}`, [`Way ${other}, range ${rOther}`, `Way ${better}, range ${rOther}`, `Way ${other}, range ${rBetter}`, `Way ${better}, range ${rOther - rBetter}`, `Way ${other}, range ${rOther - rBetter}`], s);
     },
     expected: ({ a1, a2, a3, a4, a5, b1, b2, b3, b4, b5 }) => {
       const ra = range([a1, a2, a3, a4, a5]);
@@ -528,7 +530,7 @@ export const UNIT_15: QuestionTemplate[] = [
       );
     },
     options: ({ p, w, tg, tie }) => {
-      const pool = slipPercents(p).map((x) => `${x}%`);
+      const pool = slipPercents(p, claimOf(p, w)).map((x) => `${x}%`);
       return pickRanked(`${p}%`, pool, [(o) => Number(o.replace("%", ""))], [tg], tie, [`${claimOf(p, w)}%`]);
     },
     expected: ({ p }) => `${p}%`,
@@ -665,6 +667,8 @@ export const UNIT_15: QuestionTemplate[] = [
         "Fell every week",
         "Rose by the same amount each week",
         "Highest in week 1",
+        "Highest in week 2",
+        "Highest in week 3",
         "Highest in week 4",
         "Lowest in week 4",
         "Lowest in week 2",

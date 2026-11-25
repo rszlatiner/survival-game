@@ -9,7 +9,7 @@ overlapChecks(UNIT_15);
 coordinateChecks(UNIT_15);
 rankChecks(UNIT_15);
 valueRankChecks(UNIT_15);
-coordRankChecks(UNIT_15, ["u15-percent-claim-01", "u15-trend-choice-01", "u15-conclusion-01"]);
+coordRankChecks(UNIT_15, ["u15-percent-claim-01", "u15-trend-choice-01", "u15-conclusion-01", "u15-consistency-01"]);
 
 const get = (id: string) => UNIT_15.find((t) => t.id === id)!;
 const near = (a: number, b: number | string) => Math.abs(a - Number(b)) < 1e-9;
@@ -93,7 +93,7 @@ describe("unit 15 independent recompute", () => {
     }));
   it("backtoback-01", () =>
     run("u15-backtoback-01", (p, e) => {
-      const rows = [...p.matchAll(/(\d): A ([\d-]+), B ([\d-]+)/g)];
+      const rows = [...p.matchAll(/(\d) \| A: ([\d-]+) \| B: ([\d-]+)/g)];
       const val = (g: 2 | 3) => rows.flatMap((m) => (m[g] === "-" ? [] : m[g].split("").map((l) => Number(m[1]) * 10 + Number(l)))).sort((x, y) => x - y);
       const A = val(2), B = val(3);
       expect(A).toHaveLength(5);
