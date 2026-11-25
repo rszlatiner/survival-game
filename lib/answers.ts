@@ -1,9 +1,19 @@
+import { evalExpr, parseExpr, variablesOf } from "@/lib/mathexpr";
+
 export type AnswerFormat =
-  | { kind: "integer" }
-  | { kind: "decimal"; places: number }
-  | { kind: "fraction" }
-  | { kind: "percent" }
-  | { kind: "choice"; options: string[] };
+  /**
+   * `allowExpression` (numeric kinds only, default off): also accept a pure-number
+   * expression such as 2^3 or (3+4)/7 and judge its value. Use it only for
+   * questions like "write as a power" or "simplify this fraction"; never on
+   * "work out" arithmetic, where it would let the engine do the student's maths.
+   */
+  | { kind: "integer"; allowExpression?: boolean }
+  | { kind: "decimal"; places: number; allowExpression?: boolean }
+  | { kind: "fraction"; allowExpression?: boolean }
+  | { kind: "percent"; allowExpression?: boolean }
+  | { kind: "choice"; options: string[] }
+  /** `expected` is a string expression such as "3x+6"; any equivalent form is accepted. */
+  | { kind: "expression" };
 
 const NUM = /^[+-]?(\d+\.?\d*|\.\d+)$/;
 const INT = /^[+-]?\d+$/;
@@ -25,11 +35,51 @@ function parsePlain(s: string, allowThousands: boolean): number | null {
  * Parse a student's typed answer to a number. Never throws; returns null if
  * the text is not an acceptable spelling for the given format.
  * Percent spellings ("50%") yield the fraction value (0.5).
+ *
+ * Plain spellings ("12", "1,5", "3/4", "50%") are judged first, exactly as
+ * before. Only when the format sets `allowExpression`, that fails, and the
+ * text contains an operator, bracket or "^" is it tried as a pure-number expression ("2^3", "(3+4)/7", "1/2+1/4"):
+ * evaluated, then held to the format (integer must be whole). A variable makes
+ * it invalid. Exception: for fraction and percent a slash-only text such as
+ * "1/2/3" or "1.5/3" keeps the strict a/b rule and is not re-read as an
+ * expression. With the flag on, "6/2" for an integer question evaluates to 3 and
+ * is accepted; with it off (the default) it is rejected as it always was.
  */
 export function parseNumeric(input: string, format: AnswerFormat): number | null {
-  if (typeof input !== "string" || format.kind === "choice") return null;
+  if (typeof input !== "string" || format.kind === "choice" || format.kind === "expression") return null;
   const s = input.replace(/[−‒-—]/g, "-").trim();
   if (s === "" || s.length > 40) return null;
+  const plain = parsePlainAnswer(s, format);
+  if (plain !== null) return plain;
+  return format.allowExpression === true ? parseNumericExpression(s, format) : null;
+}
+
+/** Characters that mark text as an attempted expression rather than a malformed plain number. */
+function looksLikeExpression(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if ("^()*+×÷·/²³√".includes(c)) return true;
+    if (c === "-" && i > 0) return true;
+  }
+  return false;
+}
+
+function parseNumericExpression(s: string, format: AnswerFormat): number | null {
+  if (!looksLikeExpression(s)) return null;
+  const rational = format.kind === "fraction" || format.kind === "percent";
+  if (rational && /^[+-]?[0-9.,/\s]*$/.test(s)) return null; // slash-only: strict legacy rule stands
+  const e = parseExpr(s);
+  if (e === null || variablesOf(e).length > 0) return null;
+  const v = evalExpr(e, {});
+  if (v === null) return null;
+  if (format.kind === "integer") {
+    const r = Math.round(v);
+    return Math.abs(v - r) <= EPS * Math.max(1, Math.abs(v)) ? r : null;
+  }
+  return v;
+}
+
+function parsePlainAnswer(s: string, format: AnswerFormat): number | null {
 
   const rational = format.kind === "fraction" || format.kind === "percent";
   const slash = s.split("/");
@@ -70,6 +120,7 @@ function near(a: number, b: number): boolean {
 /** Check a typed answer against the expected value. Never throws. */
 export function isCorrect(input: string, expected: number | string, format: AnswerFormat): boolean {
   if (format.kind === "choice") return typeof expected === "string" && input === expected;
+  if (format.kind === "expression") return typeof expected === "string" && expressionsEquivalent(input, expected);
   if (typeof expected !== "number" || !Number.isFinite(expected)) return false;
   const v = parseNumeric(input, format);
   if (v === null) return false;
@@ -89,4 +140,42 @@ export function isCorrect(input: string, expected: number | string, format: Answ
       return bare && near(v / 100, expected);
     }
   }
+}
+
+/**
+ * Fixed, deterministic sample values; variable j at sample i uses
+ * SAMPLES[(i + 3j) % 8] plus 0.37 per full group of 8 variables, so that
+ * more than 8 variables never share a value (no aliasing).
+ */
+const SAMPLES = [2, -3, 0.5, 7, 1.5, -1, 4, 11];
+const MIN_VALID_POINTS = 5;
+
+/**
+ * True when `input` and the author's `expected` are the same function of the
+ * same variables: both parse, the input uses only variables found in
+ * `expected`, and they agree (relative tolerance 1e-9) at 8 fixed sample
+ * points. Points where either side is undefined (1/0, sqrt of a negative) are
+ * skipped, and at least 5 must remain. Equivalent forms are all accepted:
+ * factorised and expanded answers are NOT distinguished, so (x+1)^2,
+ * x^2+2x+1 and 1+2x+x*x are all correct for expected "(x+1)^2". Two constant
+ * expressions compare as plain numbers.
+ */
+function expressionsEquivalent(input: string, expected: string): boolean {
+  if (typeof input !== "string") return false;
+  const a = parseExpr(input.trim());
+  const b = parseExpr(expected);
+  if (a === null || b === null) return false;
+  const vars = variablesOf(b);
+  if (variablesOf(a).some((v) => !vars.includes(v))) return false;
+  let valid = 0;
+  for (let i = 0; i < SAMPLES.length; i++) {
+    const point: Record<string, number> = {};
+    vars.forEach((v, j) => (point[v] = SAMPLES[(i + 3 * j) % SAMPLES.length] + Math.floor(j / SAMPLES.length) * 0.37));
+    const x = evalExpr(a, point);
+    const y = evalExpr(b, point);
+    if (x === null || y === null) continue;
+    valid++;
+    if (!near(x, y)) return false;
+  }
+  return valid >= MIN_VALID_POINTS;
 }

@@ -1,4 +1,5 @@
 import type { AnswerFormat } from "@/lib/answers";
+import { prettyMath } from "@/lib/mathpretty";
 import { ROUNDS } from "@/lib/config";
 import type { PublicQuestion, Resource, ZoneId } from "@/lib/questions/types";
 import type { BuildId, GameLength, GameState, Phase, Stock } from "@/lib/types";
@@ -70,6 +71,7 @@ const tidy = (x: number) => String(Number(x.toPrecision(12)));
 
 /** Display text for an expected answer. */
 export function displayExpected(expected: number | string, format: AnswerFormat): string {
+  if (format.kind === "expression") return prettyMath(String(expected));
   if (typeof expected === "string") return expected;
   switch (format.kind) {
     case "decimal": {

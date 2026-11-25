@@ -1,6 +1,7 @@
 import { makeRng } from "@/lib/rng";
 import { ALL_TEMPLATES } from "@/content/units";
 import type { AnswerFormat } from "@/lib/answers";
+import { parseExpr } from "@/lib/mathexpr";
 import type {
   Difficulty,
   GeneratedQuestion,
@@ -26,6 +27,10 @@ function shuffle<T>(items: readonly T[], rng: () => number): T[] {
 export function generateQuestion(t: QuestionTemplate, zone: ZoneId, seed: string): GeneratedQuestion {
   const p = t.params(makeRng(`${seed}:${t.id}`));
   const expected = t.expected(p);
+  // An author's expression must parse, or no student answer could ever match it.
+  if (t.format.kind === "expression" && (typeof expected !== "string" || parseExpr(expected) === null)) {
+    throw new Error(`template ${t.id}: expected must be a valid expression string, got ${JSON.stringify(expected)}`);
+  }
   let format: AnswerFormat = t.format;
   const publicQ: PublicQuestion = {
     templateId: t.id,

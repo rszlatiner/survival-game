@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { isCorrect, parseNumeric } from "@/lib/answers";
 import { MAX_ANSWER_LENGTH } from "@/lib/config";
+import { parseExpr } from "@/lib/mathexpr";
 import { ZONE_IDS, RESOURCES, type QuestionTemplate, type ZoneId } from "@/lib/questions/types";
 import { generateQuestion } from "@/lib/questions/generate";
 import { unitReadiness } from "@/lib/questions/ready";
@@ -134,7 +135,7 @@ export function bankChecks(unit: number, bank: QuestionTemplate[]) {
       expect(bank.filter((t) => t.format.kind !== "choice").length).toBeGreaterThanOrEqual(8);
     });
     it("never uses the percent or fraction format (their parser cannot take the exact answer string)", () => {
-      for (const t of bank) expect(["integer", "decimal", "choice"]).toContain(t.format.kind);
+      for (const t of bank) expect(["integer", "decimal", "choice", "expression"]).toContain(t.format.kind);
     });
   });
 
@@ -176,6 +177,12 @@ export function bankChecks(unit: number, bank: QuestionTemplate[]) {
               if (ev < Math.min(...others)) smallest++;
             }
             void lens;
+          } else if (t.format.kind === "expression") {
+            // Typed algebra: expected is expression text that parses and accepts itself.
+            expect(typeof expected, where).toBe("string");
+            expect(parseExpr(expected as string), where).not.toBeNull();
+            expect(isCorrect(expected as string, expected, publicQ.format), where).toBe(true);
+            expect(solution, where).toContain(expected as string);
           } else {
             expect(typeof expected, where).toBe("number");
             const n = expected as number;
