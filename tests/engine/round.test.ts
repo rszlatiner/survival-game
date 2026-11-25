@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import * as generate from "@/lib/questions/generate";
 import { GameError, createGame, addTeam, joinTeam, startGame, captainOf, setCaptain } from "@/lib/engine/game";
 import { startRound, submitAnswer, revealRound, nextAllowed, rollFor, outcomeForRoll } from "@/lib/engine/round";
 import { YIELD, ZONES } from "@/lib/config";
@@ -92,9 +93,15 @@ describe("startRound", () => {
     expect(code(() => startRound(g, T0))).toBe("WRONG_PHASE");
   });
   it("throws NO_QUESTIONS when no unit has ready templates", () => {
+    // Every unit now has a bank, so simulate a unit with none: the picker finds nothing.
     let g = createGame({ units: [15], length: "quick", timerSeconds: 60, seed: "s", code: "ABC234", now: 1 });
     g = startGame(addTeam(g, "A", "d0").g);
-    expect(code(() => startRound(g, T0))).toBe("NO_QUESTIONS");
+    const spy = vi.spyOn(generate, "pickTemplates").mockReturnValue([]);
+    try {
+      expect(code(() => startRound(g, T0))).toBe("NO_QUESTIONS");
+    } finally {
+      spy.mockRestore();
+    }
   });
   it("sets hazard on rounds 4 and 8 only", () => {
     let g = started(1, "s1", "standard");
