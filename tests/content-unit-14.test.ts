@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_14 } from "@/content/units/unit-14";
 import { bankChecks, overlapChecks, coordinateChecks } from "./helpers/bank";
+import { coordRankChecks } from "./helpers/rank2";
 import { rankChecks, valueRankChecks } from "./helpers/rank";
 
 bankChecks(14, UNIT_14);
@@ -8,6 +9,7 @@ overlapChecks(UNIT_14);
 coordinateChecks(UNIT_14);
 rankChecks(UNIT_14);
 valueRankChecks(UNIT_14);
+coordRankChecks(UNIT_14, ["u14-shape-sym-01", "u14-box-compare-01"]);
 
 import { eachQuestion, numsIn } from "./helpers/bank";
 const get = (id: string) => UNIT_14.find((t) => t.id === id)!;
@@ -35,16 +37,38 @@ describe("unit 14 independent recompute", () => {
 
   it("cuboid-vol-01", () => run("u14-cuboid-vol-01", (p, e) => { const [l, w, h] = nums(p); expect(Number(e)).toBe(l * w * h); }));
   it("cube-surface-01", () => run("u14-cube-surface-01", (p, e) => { const [a] = nums(p); expect(Number(e)).toBe(6 * a * a); }));
-  it("polygon-lines-01", () => run("u14-polygon-lines-01", (p, e) => { expect(Number(e)).toBe(Number(/with (\d+) equal sides/.exec(p)![1])); }));
   it("solid-identify-01: exactly one listed solid has the stated counts", () =>
     run("u14-solid-identify-01", (p, e, opts, where) => {
-      const [f, ed, v] = nums(p);
+      const [f, ed, v] = (/It has (\d+) faces, (\d+) edges and (\d+) vertices/.exec(p) as RegExpExecArray).slice(1).map(Number);
       expect(f - ed + v, where).toBe(2); // Euler's formula holds for the stated counts
       expect(opts!.filter((o) => counts(o).join() === [f, ed, v].join()), where).toEqual([e]);
       for (const o of opts!) expect(SOLIDS[o]).toEqual(counts(o));
     }));
   it("cube-edge-01", () => run("u14-cube-edge-01", (p, e) => { const [v] = nums(p); expect(Number(e) ** 3).toBe(v); }));
   it("prism-vol-01", () => run("u14-prism-vol-01", (p, e) => { const [a, l] = nums(p); expect(Number(e)).toBe(a * l); }));
+  it("unit-convert-01", () =>
+    run("u14-unit-convert-01", (p, e) => {
+      const n = numsIn(p.replace(/cm\u00b3|m\u00b3|mm\u00b3/g, "u"));
+      const given = n[0];
+      if (/litres of/.test(p)) expect(Number(e)).toBe(given * 1000);
+      else if (/mm\u00b3\. What/.test(p)) expect(Number(e)).toBe(given * 1000);
+      else if (/m\u00b3 of space/.test(p)) expect(Number(e)).toBe(given * 1000000);
+      else expect(Number(e) * 1000).toBe(given);
+    }));
+  it("planes-sym-01", () =>
+    run("u14-planes-sym-01", (p, e) => {
+      if (/square ends/.test(p)) expect(e).toBe(5);
+      else if (/cuboid \d+ cm by \d+ cm by/.test(p)) expect(e).toBe(3);
+      else if (/a cube/.test(p)) expect(e).toBe(9);
+      else if (/pyramid/.test(p)) expect(e).toBe(4);
+      else if (/equilateral/.test(p)) expect(e).toBe(4);
+      else expect(e).toBe(Number(/with (\d+) sides/.exec(p)![1]) + 1);
+    }));
+  it("cylinder-vol-01", () =>
+    run("u14-cylinder-vol-01", (p, e) => {
+      const [r, h] = [Number(/radius of (\d+)/.exec(p)![1]), Number(/height of (\d+)/.exec(p)![1])];
+      expect(Math.abs(Number(e) - (3.14 * r * r * h))).toBeLessThan(1e-6);
+    }));
   it("cuboid-surface-01", () =>
     run("u14-cuboid-surface-01", (p, e) => {
       const [l, w, h] = nums(p);
@@ -53,7 +77,6 @@ describe("unit 14 independent recompute", () => {
   it("triangle-prism-01", () => run("u14-triangle-prism-01", (p, e) => { const [b, h, l] = nums(p); expect(Number(e) * 2).toBe(b * h * l); }));
   it("litres-01", () => run("u14-litres-01", (p, e) => { const [l, w, h] = nums(p); expect(Number(e) * 1000).toBe(l * w * h); }));
   it("turn-angle-01", () => run("u14-turn-angle-01", (p, e) => { const n = Number(/order (\d+)/.exec(p)![1]); expect(Number(e) * n).toBe(360); }));
-  it("missing-edge-01", () => run("u14-missing-edge-01", (p, e) => { const [v, l, w] = nums(p); expect(Number(e) * l * w).toBe(v); }));
   it("cut-block-01", () =>
     run("u14-cut-block-01", (p, e) => {
       const [L, W, H, l, w, h] = nums(p);
@@ -61,12 +84,6 @@ describe("unit 14 independent recompute", () => {
       expect(w).toBeLessThan(W);
       expect(h).toBeLessThan(H);
       expect(Number(e)).toBe(L * W * H - l * w * h);
-    }));
-  it("open-box-01", () =>
-    run("u14-open-box-01", (p, e) => {
-      const [l, w, h] = nums(p);
-      // five faces: six faces of the closed box minus the lid
-      expect(Number(e)).toBe(2 * (l * w + l * h + w * h) - l * w);
     }));
   it("shape-sym-01: the key matches the table of shapes", () =>
     run("u14-shape-sym-01", (p, e, opts, where) => {

@@ -13,23 +13,19 @@
 import type { QuestionTemplate } from "@/lib/questions/types";
 import { int } from "@/lib/questions/random";
 import { ZONE_WORDS as Z } from "@/content/units/zones";
+import { pickSet } from "@/content/units/pickset";
+import { pickRanked } from "@/content/units/rankpick";
 
 const INT = { kind: "integer" } as const;
 const CHOICE = { kind: "choice", options: [] as string[] } as const;
+const DEC2 = { kind: "decimal", places: 2 } as const;
 const MINUS = "−";
 
-/** The key plus three distractors chosen from the candidates by the number s (different subsets on different seeds). */
+/** The key plus three distractors from the pool; s packs four random target ranks and a tie-break (see pickSet). */
 function mix(key: string, cands: string[], s: number): string[] {
-  const arr = [...new Set(cands)].filter((c) => c !== key);
-  let r = s;
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = r % (i + 1);
-    r = Math.floor(r / (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return [key, ...arr.slice(0, 3)];
+  return pickSet(key, cands, [s % 4, Math.floor(s / 4) % 4, Math.floor(s / 16) % 4, Math.floor(s / 64) % 4], Math.floor(s / 256));
 }
-const SEL = (rng: () => number) => int(rng, 0, 5039);
+const SEL = (rng: () => number) => int(rng, 0, 256 * 1000 - 1);
 
 /** Faces, edges, vertices of common solids (each triple is different). */
 const SOLIDS: { name: string; f: number; e: number; v: number }[] = [
@@ -44,16 +40,16 @@ const SOLIDS: { name: string; f: number; e: number; v: number }[] = [
 ];
 
 /** Shapes with their number of lines of symmetry and order of rotational symmetry. */
-const SHAPES: { text: string; l: number; o: number }[] = [
-  { text: "a rectangle that is not a square", l: 2, o: 2 },
-  { text: "a rhombus that is not a square", l: 2, o: 2 },
-  { text: "an equilateral triangle", l: 3, o: 3 },
-  { text: "a square", l: 4, o: 4 },
-  { text: "a regular pentagon", l: 5, o: 5 },
-  { text: "a regular hexagon", l: 6, o: 6 },
-  { text: "a parallelogram that is not a rectangle or a rhombus", l: 0, o: 2 },
-  { text: "an isosceles trapezium", l: 1, o: 1 },
-  { text: "a kite that is not a rhombus", l: 1, o: 1 },
+const SHAPES: { text: string; l: number; o: number; eq: boolean }[] = [
+  { text: "a rectangle that is not a square", l: 2, o: 2, eq: false },
+  { text: "a rhombus that is not a square", l: 2, o: 2, eq: true },
+  { text: "an equilateral triangle", l: 3, o: 3, eq: true },
+  { text: "a square", l: 4, o: 4, eq: true },
+  { text: "a regular pentagon", l: 5, o: 5, eq: true },
+  { text: "a regular hexagon", l: 6, o: 6, eq: true },
+  { text: "a parallelogram that is not a rectangle or a rhombus", l: 0, o: 2, eq: false },
+  { text: "an isosceles trapezium", l: 1, o: 1, eq: false },
+  { text: "a kite that is not a rhombus", l: 1, o: 1, eq: false },
 ];
 const sym = (l: number, o: number) => `${l} ${l === 1 ? "line" : "lines"}, order ${o}`;
 
@@ -62,7 +58,20 @@ const TRIPLES: [number, number, number][] = [
   [6, 8, 10],
   [5, 12, 13],
   [8, 15, 17],
+  [9, 12, 15],
+  [7, 24, 25],
+  [12, 16, 20],
 ];
+
+/** Wrong sizes a student might give: difference of surface areas, of edge sums, of base areas (all positive, all different from the volume difference). */
+function slipSizes(p: Record<string, number>): number[] {
+  const { l1, w1, h1, l2, w2, h2 } = p;
+  const d = Math.abs(l1 * w1 * h1 - l2 * w2 * h2);
+  const m1 = Math.abs(2 * (l1 * w1 + l1 * h1 + w1 * h1) - 2 * (l2 * w2 + l2 * h2 + w2 * h2));
+  const m2 = Math.abs(l1 + w1 + h1 - (l2 + w2 + h2)) * 12;
+  const m3 = Math.abs(l1 * w1 - l2 * w2) * Math.max(h1, h2);
+  return [m1, m2, m3].map((v) => (v === d || v === 0 ? v + 7 : v));
+}
 
 export const UNIT_14: QuestionTemplate[] = [
   // ---------------- Difficulty 1 ----------------
@@ -84,7 +93,7 @@ export const UNIT_14: QuestionTemplate[] = [
     difficulty: 1,
     resource: "stone",
     format: INT,
-    params: (rng) => ({ a: int(rng, 2, 12) }),
+    params: (rng) => ({ a: int(rng, 2, 20) }),
     prompt: ({ a }, zone) =>
       `${Z[zone].Place}, you paint every face of a cube-shaped box with edges of ${a} cm. What is the total area painted, in cm²?`,
     expected: ({ a }) => 6 * a * a,
@@ -92,17 +101,27 @@ export const UNIT_14: QuestionTemplate[] = [
       `One face is a square of area ${a} × ${a} = ${a * a} cm². A cube has 6 faces, so the total is 6 × ${a * a} = ${6 * a * a} cm².`,
   },
   {
-    id: "u14-polygon-lines-01",
+    id: "u14-unit-convert-01",
     unit: 14,
     difficulty: 1,
     resource: "food",
     format: INT,
-    params: (rng) => ({ n: int(rng, 3, 10), s: int(rng, 10, 40) }),
-    prompt: ({ n, s }, zone) =>
-      `${Z[zone].Place}, you arrange ${Z[zone].wood} into a regular polygon with ${n} equal sides, each ${s} cm long. ` +
-      `How many lines of symmetry does the shape have?`,
-    expected: ({ n }) => n,
-    solution: ({ n }) => `A regular polygon has one line of symmetry for each of its sides, so a polygon with ${n} sides has ${n} lines of symmetry.`,
+    params: (rng) => ({ v: int(rng, 0, 3), n: int(rng, 2, 9), big: int(rng, 12, 48) }),
+    prompt: ({ v, n, big }, zone) =>
+      [
+        `${Z[zone].Place}, a water bottle holds ${big} litres of ${Z[zone].water}. 1 litre = 1000 ml. How many ml is that?`,
+        `${Z[zone].Place}, a stone block has a volume of ${big} cm\u00b3. 1 cm\u00b3 = 1000 mm\u00b3. What is its volume in mm\u00b3?`,
+        `${Z[zone].Place}, a shelter has ${n} m\u00b3 of space inside. 1 m\u00b3 = 1000000 cm\u00b3. How many cm\u00b3 is that?`,
+        `${Z[zone].Place}, a tank holds ${big * 1000} cm\u00b3 of ${Z[zone].water}. 1 litre = 1000 cm\u00b3. How many litres is that?`,
+      ][v],
+    expected: ({ v, n, big }) => [big * 1000, big * 1000, n * 1000000, big][v],
+    solution: ({ v, n, big }) =>
+      [
+        `1 litre is 1000 ml, so multiply by 1000: ${big} \u00d7 1000 = ${big * 1000} ml.`,
+        `1 cm\u00b3 is 1000 mm\u00b3, so multiply by 1000: ${big} \u00d7 1000 = ${big * 1000} mm\u00b3.`,
+        `1 m\u00b3 is 1000000 cm\u00b3, so multiply by 1000000: ${n} \u00d7 1000000 = ${n * 1000000} cm\u00b3.`,
+        `1 litre is 1000 cm\u00b3, so divide by 1000: ${big * 1000} \u00f7 1000 = ${big} litres.`,
+      ][v],
   },
   {
     id: "u14-solid-identify-01",
@@ -110,9 +129,9 @@ export const UNIT_14: QuestionTemplate[] = [
     difficulty: 1,
     resource: "water",
     format: CHOICE,
-    params: (rng) => ({ t: int(rng, 0, SOLIDS.length - 1), s: SEL(rng) }),
-    prompt: ({ t }, zone) =>
-      `${Z[zone].Place}, you build a model from ${Z[zone].wood}. It has ${SOLIDS[t].f} faces, ${SOLIDS[t].e} edges and ${SOLIDS[t].v} vertices. ` +
+    params: (rng) => ({ t: int(rng, 0, SOLIDS.length - 1), s: SEL(rng), edge: int(rng, 5, 30) }),
+    prompt: ({ t, edge }, zone) =>
+      `${Z[zone].Place}, you build a model from ${Z[zone].wood}, ${edge} cm tall. It has ${SOLIDS[t].f} faces, ${SOLIDS[t].e} edges and ${SOLIDS[t].v} vertices. ` +
       `Which solid is it?`,
     options: ({ t, s }) =>
       mix(
@@ -131,7 +150,7 @@ export const UNIT_14: QuestionTemplate[] = [
     difficulty: 1,
     resource: "water",
     format: INT,
-    params: (rng) => ({ a: int(rng, 2, 9) }),
+    params: (rng) => ({ a: int(rng, 2, 15) }),
     prompt: ({ a }, zone) =>
       `${Z[zone].Place}, a cube-shaped tank holds exactly ${a * a * a} cm³ of ${Z[zone].water}. How long is one edge of the tank, in centimetres?`,
     expected: ({ a }) => a,
@@ -208,7 +227,7 @@ export const UNIT_14: QuestionTemplate[] = [
     difficulty: 2,
     resource: "food",
     format: INT,
-    params: (rng) => ({ n: [3, 4, 5, 6, 8, 9, 10, 12][int(rng, 0, 7)], m: int(rng, 2, 4) }),
+    params: (rng) => ({ n: [3, 4, 5, 6, 8, 9, 10, 12][int(rng, 0, 7)], m: int(rng, 2, 8) }),
     prompt: ({ n, m }, zone) =>
       `${Z[zone].Place}, you lay out a pattern of ${n * m} ${Z[zone].wood} with rotational symmetry of order ${n}. ` +
       `What is the smallest turn, in degrees, that fits the pattern exactly onto itself?`,
@@ -216,19 +235,33 @@ export const UNIT_14: QuestionTemplate[] = [
     solution: ({ n }) => `A full turn is 360°. With order ${n}, the pattern fits onto itself ${n} times in one full turn, so the smallest turn is 360 ÷ ${n} = ${360 / n}°.`,
   },
   {
-    id: "u14-missing-edge-01",
+    id: "u14-planes-sym-01",
     unit: 14,
     difficulty: 2,
     resource: "stone",
     format: INT,
-    params: (rng) => ({ l: int(rng, 3, 12), w: int(rng, 2, 9), h: int(rng, 2, 9) }),
-    prompt: ({ l, w, h }, zone) =>
-      `${Z[zone].Place}, a cuboid block has a volume of ${l * w * h} cm³. It is ${l} cm long and ${w} cm wide. ` +
-      `How high is the block, in centimetres?`,
-    expected: ({ h }) => h,
-    solution: ({ l, w, h }) =>
-      `Volume = length × width × height, so height = volume ÷ (length × width). ${l} × ${w} = ${l * w}, ` +
-      `and ${l * w * h} ÷ ${l * w} = ${h}. The block is ${h} cm high.`,
+    params: (rng) => ({ kind: int(rng, 0, 5), a: int(rng, 3, 9), b: int(rng, 10, 16), n: int(rng, 5, 9) }),
+    prompt: ({ kind, a, b, n }, zone) =>
+      `${Z[zone].Place}, you make a model. It is ` +
+      [
+        `a cuboid with square ends of side ${a} cm and a length of ${b} cm`,
+        `a cuboid ${a} cm by ${a + 2} cm by ${b} cm`,
+        `a cube with edges of ${a} cm`,
+        `a pyramid with a square base of side ${a} cm and its point directly above the centre`,
+        `a prism ${b} cm long whose ends are equilateral triangles of side ${a} cm`,
+        `a prism ${b} cm long whose ends are regular polygons with ${n} sides`,
+      ][kind] +
+      `. How many planes of symmetry does it have?`,
+    expected: ({ kind, n }) => [5, 3, 9, 4, 4, n + 1][kind],
+    solution: ({ kind, n }) =>
+      [
+        `A plane of symmetry cuts the solid into two mirror-image halves. The square ends give 4 planes along the length (2 through the middle of the sides, 2 through the diagonals) and 1 across the middle: 4 + 1 = 5.`,
+        `With all three edges different there is one plane parallel to each pair of faces, through the middle: 3 planes.`,
+        `A cube has 3 planes parallel to the faces and 6 through opposite edges: 3 + 6 = 9.`,
+        `The square base gives 4 lines of symmetry, and each line gives a plane up through the point: 4 planes.`,
+        `An equilateral triangle has 3 lines of symmetry, giving 3 planes along the length, plus 1 across the middle: 3 + 1 = 4.`,
+        `A regular polygon with ${n} sides has ${n} lines of symmetry, giving ${n} planes along the length, plus 1 across the middle: ${n} + 1 = ${n + 1}.`,
+      ][kind],
   },
   {
     id: "u14-cut-block-01",
@@ -251,19 +284,18 @@ export const UNIT_14: QuestionTemplate[] = [
       `Left: ${L * W * H} ${MINUS} ${l * w * h} = ${L * W * H - l * w * h} cm³.`,
   },
   {
-    id: "u14-open-box-01",
+    id: "u14-cylinder-vol-01",
     unit: 14,
     difficulty: 2,
     resource: "water",
-    format: INT,
-    params: (rng) => ({ l: int(rng, 4, 10), w: int(rng, 3, 8), h: int(rng, 2, 6) }),
-    prompt: ({ l, w, h }, zone) =>
-      `${Z[zone].Place}, you make an open-topped box (no lid) from a flat net. The box is ${l} cm long, ${w} cm wide and ${h} cm high. ` +
-      `What is the total area of the net, in cm²?`,
-    expected: ({ l, w, h }) => l * w + 2 * l * h + 2 * w * h,
-    solution: ({ l, w, h }) =>
-      `The net has a base ${l} × ${w} = ${l * w}, two long sides 2 × (${l} × ${h}) = ${2 * l * h}, and two short sides 2 × (${w} × ${h}) = ${2 * w * h}. ` +
-      `There is no lid. Total = ${l * w} + ${2 * l * h} + ${2 * w * h} = ${l * w + 2 * l * h + 2 * w * h} cm².`,
+    format: DEC2,
+    params: (rng) => ({ r: int(rng, 2, 9), h: int(rng, 2, 12) }),
+    prompt: ({ r, h }, zone) =>
+      `${Z[zone].Place}, a barrel for ${Z[zone].water} is a cylinder with a radius of ${r} cm and a height of ${h} cm. ` +
+      `Use \u03c0 = 3.14. What is its volume in cm\u00b3?`,
+    expected: ({ r, h }) => Math.round(314 * r * r * h) / 100,
+    solution: ({ r, h }) =>
+      `Volume of a cylinder = \u03c0 \u00d7 radius\u00b2 \u00d7 height = 3.14 \u00d7 ${r * r} \u00d7 ${h} = 3.14 \u00d7 ${r * r * h} = ${Math.round(314 * r * r * h) / 100} cm\u00b3.`,
   },
   {
     id: "u14-shape-sym-01",
@@ -273,7 +305,7 @@ export const UNIT_14: QuestionTemplate[] = [
     format: CHOICE,
     params: (rng) => ({ t: int(rng, 0, SHAPES.length - 1), side: int(rng, 8, 40), s: SEL(rng) }),
     prompt: ({ t, side }, zone) =>
-      `${Z[zone].Place}, you lay ${Z[zone].wood} in the shape of ${SHAPES[t].text}, with a longest side of ${side} cm. ` +
+      `${Z[zone].Place}, you lay ${Z[zone].wood} in the shape of ${SHAPES[t].text}, ${SHAPES[t].eq ? `with each side ${side} cm long` : `with a longest side of ${side} cm`}. ` +
       `How many lines of symmetry does it have, and what is its order of rotational symmetry?`,
     options: ({ t, s }) => {
       const { l, o } = SHAPES[t];
@@ -343,39 +375,36 @@ export const UNIT_14: QuestionTemplate[] = [
     resource: "food",
     format: CHOICE,
     params(rng) {
-      for (let i = 0; i < 100; i++) {
-        const p = { l1: int(rng, 3, 9), w1: int(rng, 2, 8), h1: int(rng, 2, 8), l2: int(rng, 3, 9), w2: int(rng, 2, 8), h2: int(rng, 2, 8), s: SEL(rng) };
+      const t = int(rng, 0, 2);
+      const tie = int(rng, 0, 999);
+      for (let i = 0; i < 300; i++) {
+        const p = { l1: int(rng, 3, 9), w1: int(rng, 2, 8), h1: int(rng, 2, 8), l2: int(rng, 3, 9), w2: int(rng, 2, 8), h2: int(rng, 2, 8), t, tie };
         const va = p.l1 * p.w1 * p.h1;
         const vb = p.l2 * p.w2 * p.h2;
-        const sa = 2 * (p.l1 * p.w1 + p.l1 * p.h1 + p.w1 * p.h1);
-        const sb = 2 * (p.l2 * p.w2 + p.l2 * p.h2 + p.w2 * p.h2);
-        const d = Math.abs(va - vb);
-        const m1 = Math.abs(sa - sb);
-        const m2 = Math.abs(p.l1 + p.w1 + p.h1 - (p.l2 + p.w2 + p.h2));
-        const m3 = Math.abs(p.l1 * p.w1 - p.l2 * p.w2);
-        if (d > 0 && new Set([d, m1, m2, m3].filter((v) => v > 0)).size === 4 && [m1, m2, m3].every((v) => v > 0)) return p;
+        const hi = Math.max(va, vb);
+        const lo = Math.min(va, vb);
+        // similar boxes: the bigger is between 1.1 and 1.8 times the smaller, so the difference is smaller than either volume
+        if (hi >= 1.1 * lo && hi <= 1.8 * lo && slipSizes(p).every((v) => v > 0)) return p;
       }
-      return { l1: 4, w1: 5, h1: 6, l2: 3, w2: 8, h2: 5, s: 1 };
+      return { l1: 4, w1: 5, h1: 6, l2: 3, w2: 8, h2: 6, t, tie };
     },
     prompt: ({ l1, w1, h1, l2, w2, h2 }, zone) =>
       `${Z[zone].Place}, you have two cuboid boxes to store ${Z[zone].food}. Box A is ${l1} cm by ${w1} cm by ${h1} cm. ` +
-      `Box B is ${l2} cm by ${w2} cm by ${h2} cm. Which box has the larger volume, and by how many cm³?`,
-    options: ({ l1, w1, h1, l2, w2, h2, s }) => {
+      `Box B is ${l2} cm by ${w2} cm by ${h2} cm. Which box has the larger volume, and by how many cm\u00b3?`,
+    options: (p) => {
+      const { l1, w1, h1, l2, w2, h2, t, tie } = p;
       const va = l1 * w1 * h1;
       const vb = l2 * w2 * h2;
       const big = va > vb ? "A" : "B";
       const small = va > vb ? "B" : "A";
       const d = Math.abs(va - vb);
-      const sa = 2 * (l1 * w1 + l1 * h1 + w1 * h1);
-      const sb = 2 * (l2 * w2 + l2 * h2 + w2 * h2);
-      const m1 = Math.abs(sa - sb);
-      const m2 = Math.abs(l1 + w1 + h1 - (l2 + w2 + h2));
-      const m3 = Math.abs(l1 * w1 - l2 * w2);
-      return mix(
-        `Box ${big}, by ${d}`,
-        [`Box ${small}, by ${d}`, `Box ${big}, by ${m1}`, `Box ${small}, by ${m1}`, `Box ${big}, by ${m2}`, `Box ${small}, by ${m2}`, `Box ${big}, by ${m3}`, `Box ${small}, by ${m3}`],
-        s,
-      );
+      const [m1, m2, m3] = slipSizes(p);
+      const text = (box: string, x: number) => `Box ${box}, by ${x}`;
+      const pool = [text(big, m1), text(small, m1), text(big, m2), text(small, m2), text(big, m3), text(small, m3), text(small, Math.min(va, vb)), text(big, Math.min(va, vb)),
+        ...[Math.abs(l1 * h1 - l2 * h2), Math.abs(w1 * h1 - w2 * h2), Math.abs(l1 - l2) + Math.abs(w1 - w2) + Math.abs(h1 - h2)].filter((v) => v > 0 && v !== d).flatMap((v) => [text(big, v), text(small, v)])];
+      // always one larger slip: the bigger volume given instead of the difference
+      const use = tie % 2 ? pool.filter((o) => o.startsWith(`Box ${small}`)) : pool;
+      return pickRanked(text(big, d), use, [(o) => Number(/by (\d+)/.exec(o)![1])], [t], tie, [text(big, Math.max(va, vb))]);
     },
     expected: ({ l1, w1, h1, l2, w2, h2 }) => {
       const va = l1 * w1 * h1;
@@ -386,7 +415,7 @@ export const UNIT_14: QuestionTemplate[] = [
       const va = l1 * w1 * h1;
       const vb = l2 * w2 * h2;
       return (
-        `Box A: ${l1} × ${w1} × ${h1} = ${va} cm³. Box B: ${l2} × ${w2} × ${h2} = ${vb} cm³. ` +
+        `Box A: ${l1} \u00d7 ${w1} \u00d7 ${h1} = ${va} cm\u00b3. Box B: ${l2} \u00d7 ${w2} \u00d7 ${h2} = ${vb} cm\u00b3. ` +
         `The difference is ${Math.max(va, vb)} ${MINUS} ${Math.min(va, vb)} = ${Math.abs(va - vb)}, so the answer is: Box ${va > vb ? "A" : "B"}, by ${Math.abs(va - vb)}.`
       );
     },
@@ -397,7 +426,7 @@ export const UNIT_14: QuestionTemplate[] = [
     difficulty: 3,
     resource: "stone",
     format: INT,
-    params: (rng) => ({ t: int(rng, 0, TRIPLES.length - 1), len: int(rng, 4, 10) }),
+    params: (rng) => ({ t: int(rng, 0, TRIPLES.length - 1), len: int(rng, 4, 14) }),
     prompt: ({ t, len }, zone) => {
       const [a, b, c] = TRIPLES[t];
       return (
@@ -424,9 +453,9 @@ export const UNIT_14: QuestionTemplate[] = [
     difficulty: 3,
     resource: "wood",
     format: INT,
-    params: (rng) => ({ n: int(rng, 4, 12) }),
-    prompt: ({ n }, zone) =>
-      `${Z[zone].Place}, you build the frame of a prism, using one length of ${Z[zone].rope} for each edge. You use ${3 * n} lengths. ` +
+    params: (rng) => ({ n: int(rng, 4, 14), cm: int(rng, 20, 60) }),
+    prompt: ({ n, cm }, zone) =>
+      `${Z[zone].Place}, you build the frame of a prism, using one ${cm} cm length of ${Z[zone].rope} for each edge. You use ${3 * n} lengths. ` +
       `How many faces does the prism have?`,
     expected: ({ n }) => n + 2,
     solution: ({ n }) =>
