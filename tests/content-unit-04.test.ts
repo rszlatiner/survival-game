@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_04 } from "@/content/units/unit-04";
-import { bankChecks, overlapChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
 
 bankChecks(4, UNIT_04);
 overlapChecks(UNIT_04);
+coordinateChecks(UNIT_04);
 
 const get = (id: string) => UNIT_04.find((t) => t.id === id)!;
 const norm = (s: string) => s.replace(/−/g, "-").replace(/×/g, "*").replace(/÷/g, "/").replace(/≥/g, ">=").replace(/≤/g, "<=");

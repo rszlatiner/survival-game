@@ -360,7 +360,7 @@ export const UNIT_04: QuestionTemplate[] = [
     prompt: ({ a, c, B }, zone) =>
       `${Z[zone].Place}, planks cost ${a} shells each. You have already spent ${c} shells on ${Z[zone].rope} and may spend at most ${B} shells in total. ` +
       `Which inequality gives the number of planks, n, you can buy?`,
-    options: ({ a, c, B }) => [`${a}n + ${c} ${LE} ${B}`, `${a}n + ${c} ${GE} ${B}`, `${a}(n + ${c}) ${GE} ${B}`, `${a}(n ${MINUS} ${c}) ${GE} ${B}`],
+    options: ({ a, c, B }) => [`${a}n + ${c} ${LE} ${B}`, `${a}n + ${c} ${GE} ${B}`, `${a}(n + ${c}) ${LE} ${B}`, `${a}(n + ${c}) ${GE} ${B}`],
     expected: ({ a, c, B }) => `${a}n + ${c} ${LE} ${B}`,
     solution: ({ a, c, B }) =>
       `n planks cost ${a}n. Add the ${c} already spent: ${a}n + ${c}. The total must not go over ${B}, so it is at most ${B}: ${a}n + ${c} ${LE} ${B}.`,
