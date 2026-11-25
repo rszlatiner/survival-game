@@ -5,7 +5,7 @@
  * a common denominator; 2 = adding, subtracting and multiplying fractions,
  * mixed numbers, dividing by a fraction, ordering, decimals to fractions;
  * 3 = finding the whole, repeated fractions of a remainder, mixed-number sums,
- * quotients, fractions between fractions and comparing parts of amounts.
+ * quotients, fractions between fractions and multiplying mixed numbers.
  * Typed answers are whole numbers or decimals. Answers that are fractions use
  * the choice format, written in simplest form with mixed numbers such as
  * "1 1/4" when the value is above 1, and every such prompt says so.
@@ -37,12 +37,39 @@ function withDistractors(correct: string, cands: string[]): string[] {
 }
 /** Denominator pairs with no common factor, so the common denominator is their product. */
 const PAIRS: [number, number][] = [[2, 3], [3, 4], [2, 5], [3, 5], [4, 5], [5, 6], [2, 7], [3, 7]];
-/** Neighbouring fractions: the fraction made by adding tops and bottoms lies strictly between them. */
-const BETWEEN: [number, number, number, number][] = [
-  [1, 3, 1, 2], [1, 4, 1, 3], [1, 5, 1, 4], [2, 5, 1, 2], [1, 2, 2, 3],
-  [2, 3, 3, 4], [3, 4, 4, 5], [1, 3, 2, 5], [3, 5, 2, 3], [2, 5, 3, 7],
-];
+/** Neighbouring fractions a/b < c/d (both simplest, below 1, denominators up to 9) with c*b - a*d = 1, so the fraction made by adding tops and bottoms lies strictly between them. */
+const BETWEEN: [number, number, number, number][] = [];
+for (let b = 2; b <= 9; b++)
+  for (let d = 2; d <= 9; d++)
+    for (let a = 1; a < b; a++)
+      for (let c = 1; c < d; c++) if (gcd(a, b) === 1 && gcd(c, d) === 1 && c * b - a * d === 1) BETWEEN.push([a, b, c, d]);
 
+/** A numerator below d that shares no factor with d, so n/d is already in simplest form. */
+function numer(rng: () => number, d: number): number {
+  for (let i = 0; i < 50; i++) {
+    const n = int(rng, 1, d - 1);
+    if (gcd(n, d) === 1) return n;
+  }
+  return 1;
+}
+/** A random order of 0..n-1 stored in params (q0, q1, ...), so wrong-answer choices vary from seed to seed. */
+function perm(rng: () => number, n: number): Record<string, number> {
+  const a = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return Object.fromEntries(a.map((v, i) => [`q${i}`, v]));
+}
+const order = (p: Record<string, number>, n: number) => Array.from({ length: n }, (_, i) => p[`q${i}`]);
+/** Wrong-answer candidates in the stored random order. */
+const shuffledCands = (p: Record<string, number>, cands: string[]) => order(p, cands.length).map((i) => cands[i]);
+/** "n/d" followed by how it simplifies, without restating an unchanged fraction. */
+function simp(n: number, d: number): string {
+  const f = fmt(n, d);
+  return f === `${n}/${d}` ? `${n}/${d} (already in simplest form)` : `${n}/${d} = ${f}`;
+}
+const parts = (n: number) => (n === 1 ? "1 part" : `${n} parts`);
 export const UNIT_08: QuestionTemplate[] = [
   // ---------------- Difficulty 1 ----------------
   {
@@ -53,13 +80,13 @@ export const UNIT_08: QuestionTemplate[] = [
     format: INT,
     params(rng) {
       const d = int(rng, 2, 8);
-      return { n: int(rng, 1, d - 1), d, k: int(rng, 2, 9) };
+      return { n: numer(rng, d), d, k: int(rng, 2, 9) };
     },
     prompt: ({ n, d, k }, zone) =>
       `${Z[zone].Place}, you catch ${d * k} ${Z[zone].food} and keep ${n}/${d} of them. How many do you keep?`,
     expected: ({ n, k }) => n * k,
     solution: ({ n, d, k }) =>
-      `Split ${d * k} into ${d} equal parts: ${d * k} ÷ ${d} = ${k} in each part. Then take ${n} parts: ${n} ${T} ${k} = ${n * k}.`,
+      `Split ${d * k} into ${d} equal parts: ${d * k} ÷ ${d} = ${k} in each part. Then take ${parts(n)}: ${n} ${T} ${k} = ${n * k}.`,
   },
   {
     id: "u08-equivalent-01",
@@ -85,11 +112,11 @@ export const UNIT_08: QuestionTemplate[] = [
     format: CHOICE,
     params(rng) {
       const [a, b] = coprimePair(rng, 1, 9, true);
-      return { a, b, g: int(rng, 2, 6) };
+      return { a, b, g: int(rng, 2, 6), ...perm(rng, 4) };
     },
     prompt: ({ a, b, g }, zone) =>
       `${g * b} ${Z[zone].stone} are in a pile, and ${g * a} of them are flat. Write ${g * a}/${g * b} in its simplest form.`,
-    options: ({ a, b, g }) => [`${a}/${b}`, `${g * a}/${g * b}`, `${b}/${a}`, `${a}/${g * b}`],
+    options: (p) => withDistractors(`${p.a}/${p.b}`, shuffledCands(p, [fmt(p.b, p.a), fmt(p.a, p.g * p.b), fmt(p.g * p.a, p.b), fmt(p.a + 1, p.b + 1)])),
     expected: ({ a, b }) => `${a}/${b}`,
     solution: ({ a, b, g }) =>
       `Divide the top and the bottom by their highest common factor, ${g}: ${g * a} ÷ ${g} = ${a} and ${g * b} ÷ ${g} = ${b}. So ${g * a}/${g * b} = ${a}/${b}.`,
@@ -102,13 +129,12 @@ export const UNIT_08: QuestionTemplate[] = [
     format: D2F,
     params(rng) {
       const d = pick(rng, [2, 4, 5, 10, 20, 25]);
-      return { n: int(rng, 1, d - 1), d };
+      return { n: numer(rng, d), d };
     },
     prompt: ({ n, d }, zone) =>
       `${Z[zone].Place}, a building plan uses ${n}/${d} of a tonne of material. Write ${n}/${d} as a decimal. Type the number only.`,
     expected: ({ n, d }) => Math.round((n * 100) / d) / 100,
-    solution: ({ n, d }) =>
-      `A fraction is a division: ${n} ÷ ${d} = ${Math.round((n * 100) / d) / 100}.`,
+    solution: ({ n, d }) => `A fraction is a division: ${n} ÷ ${d} = ${Math.round((n * 100) / d) / 100}.`,
   },
   {
     id: "u08-add-like-01",
@@ -117,17 +143,23 @@ export const UNIT_08: QuestionTemplate[] = [
     resource: "food",
     format: CHOICE,
     params(rng) {
-      const d = int(rng, 5, 12);
-      const a = int(rng, 1, d - 2);
-      return { a, b: int(rng, 1, d - a - 1), d };
+      for (let i = 0; i < 100; i++) {
+        const d = int(rng, 5, 12);
+        const a = numer(rng, d);
+        const b = numer(rng, d);
+        if (a + b < d) return { a, b, d, ...perm(rng, 5) };
+      }
+      return { a: 1, b: 2, d: 7, ...perm(rng, 5) };
     },
     prompt: ({ a, b, d }, zone) =>
       `${Z[zone].Place}, you eat ${a}/${d} of your ${Z[zone].food} in the morning and ${b}/${d} in the evening. What fraction have you eaten in total? ${SIMPLEST}`,
-    options: ({ a, b, d }) =>
-      withDistractors(fmt(a + b, d), [`${a + b}/${2 * d}`, `${a + b}/${d}`, `${a + b + 1}/${d}`, `${a * b}/${d}`, `${a + b - 1}/${d}`]),
+    options: (p) => {
+      const { a, b, d } = p;
+      return withDistractors(fmt(a + b, d), shuffledCands(p, [fmt(a + b, 2 * d), fmt(a + b + 1, d), fmt(a * b, d), fmt(a + b - 1, d), fmt(a + b, d + 1)]));
+    },
     expected: ({ a, b, d }) => fmt(a + b, d),
     solution: ({ a, b, d }) =>
-      `The denominators are the same, so add the tops and keep the bottom: ${a}/${d} + ${b}/${d} = ${a + b}/${d}. In simplest form that is ${fmt(a + b, d)}.`,
+      `The denominators are the same, so add the tops and keep the bottom: ${a}/${d} + ${b}/${d} = ${a + b}/${d}. In simplest form that is ${simp(a + b, d).includes("already") ? `${a + b}/${d}, which is already in simplest form` : fmt(a + b, d)}.`,
   },
   {
     id: "u08-remaining-01",
@@ -137,13 +169,13 @@ export const UNIT_08: QuestionTemplate[] = [
     format: INT,
     params(rng) {
       const b = int(rng, 3, 8);
-      return { a: int(rng, 1, b - 1), b, k: int(rng, 2, 9) };
+      return { a: numer(rng, b), b, k: int(rng, 2, 9) };
     },
     prompt: ({ a, b, k }, zone) =>
       `You drink ${a}/${b} of a ${b * k}-litre barrel of ${Z[zone].water}. How many litres are left?`,
     expected: ({ a, b, k }) => (b - a) * k,
     solution: ({ a, b, k }) =>
-      `Split ${b * k} into ${b} equal parts: ${b * k} ÷ ${b} = ${k} per part. You drank ${a} parts, so ${b - a} parts are left: ${b - a} ${T} ${k} = ${(b - a) * k}.`,
+      `Split ${b * k} into ${b} equal parts: ${b * k} ÷ ${b} = ${k} per part. You drank ${parts(a)}, so ${parts(b - a)} are left: ${b - a} ${T} ${k} = ${(b - a) * k}.`,
   },
 
   // ---------------- Difficulty 2 ----------------
@@ -155,16 +187,25 @@ export const UNIT_08: QuestionTemplate[] = [
     format: CHOICE,
     params(rng) {
       const [b, d] = pick(rng, PAIRS);
-      return { a: int(rng, 1, b - 1), b, c: int(rng, 1, d - 1), d };
+      return { a: numer(rng, b), b, c: numer(rng, d), d, ...perm(rng, 6) };
     },
     prompt: ({ a, b, c, d }, zone) =>
       `A wall ${Z[zone].place} is ${a}/${b} built on Monday and a further ${c}/${d} of the wall is built on Tuesday. What fraction is built altogether? ${SIMPLEST}`,
-    options: ({ a, b, c, d }) =>
-      withDistractors(fmt(a * d + b * c, b * d), [`${a + c}/${b + d}`, `${a + c}/${b * d}`, fmt(a * d + b * c + 1, b * d), fmt(a * c, b * d), `${a * d + c}/${b * d}`]),
+    options: (p) => {
+      const { a, b, c, d } = p;
+      return withDistractors(fmt(a * d + b * c, b * d), shuffledCands(p, [
+        fmt(a + c, b + d),
+        fmt(a * d + b * c, b + d),
+        fmt(a * d + b * c, b * d + 1),
+        fmt(a + c, b * d),
+        fmt(a * d + b * c + 1, b * d),
+        fmt(a * d + b * c - 1, b * d),
+      ]));
+    },
     expected: ({ a, b, c, d }) => fmt(a * d + b * c, b * d),
     solution: ({ a, b, c, d }) =>
       `Use a common denominator, ${b * d}: ${a}/${b} = ${a * d}/${b * d} and ${c}/${d} = ${b * c}/${b * d}. ` +
-      `Add: ${a * d} + ${b * c} = ${a * d + b * c}, so the total is ${a * d + b * c}/${b * d} = ${fmt(a * d + b * c, b * d)}.`,
+      `Add: ${a * d} + ${b * c} = ${a * d + b * c}, so the total is ${simp(a * d + b * c, b * d)}.`,
   },
   {
     id: "u08-subtract-unlike-01",
@@ -175,20 +216,28 @@ export const UNIT_08: QuestionTemplate[] = [
     params(rng) {
       for (let i = 0; i < 100; i++) {
         const [b, d] = pick(rng, PAIRS);
-        const a = int(rng, 1, b - 1);
-        const c = int(rng, 1, d - 1);
-        if (a * d > b * c + 1) return { a, b, c, d };
+        const a = numer(rng, b);
+        const c = numer(rng, d);
+        if (a * d > b * c + 1) return { a, b, c, d, ...perm(rng, 5) };
       }
-      return { a: 3, b: 4, c: 1, d: 3 };
+      return { a: 3, b: 4, c: 1, d: 3, ...perm(rng, 5) };
     },
     prompt: ({ a, b, c, d }, zone) =>
       `A tank of ${Z[zone].water} is ${a}/${b} full. You use ${c}/${d} of a tank. What fraction of a tank is left? ${SIMPLEST}`,
-    options: ({ a, b, c, d }) =>
-      withDistractors(fmt(a * d - b * c, b * d), [`${a * d - c}/${b * d}`, `${a * d - b * c + 1}/${b * d}`, `${a * d - b * c}/${b + d}`, fmt(a * d + b * c, b * d)]),
+    options: (p) => {
+      const { a, b, c, d } = p;
+      return withDistractors(fmt(a * d - b * c, b * d), shuffledCands(p, [
+        fmt(a * d - c, b * d),
+        fmt(a * d - b * c + 1, b * d),
+        fmt(a * d - b * c, b + d),
+        fmt(a * d + b * c, b * d),
+        fmt(a * d - b * c - 1, b * d),
+      ]));
+    },
     expected: ({ a, b, c, d }) => fmt(a * d - b * c, b * d),
     solution: ({ a, b, c, d }) =>
       `Use a common denominator, ${b * d}: ${a}/${b} = ${a * d}/${b * d} and ${c}/${d} = ${b * c}/${b * d}. ` +
-      `Subtract: ${a * d} ${M} ${b * c} = ${a * d - b * c}, so ${a * d - b * c}/${b * d} = ${fmt(a * d - b * c, b * d)}.`,
+      `Subtract: ${a * d} ${M} ${b * c} = ${a * d - b * c}, so ${simp(a * d - b * c, b * d)}.`,
   },
   {
     id: "u08-improper-01",
@@ -198,13 +247,13 @@ export const UNIT_08: QuestionTemplate[] = [
     format: INT,
     params(rng) {
       const d = int(rng, 2, 9);
-      return { w: int(rng, 1, 5), n: int(rng, 1, d - 1), d };
+      return { w: int(rng, 1, 5), n: numer(rng, d), d };
     },
     prompt: ({ w, n, d }, zone) =>
       `A raft ${Z[zone].place} is ${w} ${n}/${d} lengths of ${Z[zone].rope} long. Written as an improper fraction it is ?/${d}. What is the top number?`,
     expected: ({ w, n, d }) => w * d + n,
     solution: ({ w, n, d }) =>
-      `${w} whole ones are ${w} ${T} ${d} = ${w * d} parts of size 1/${d}. Add the ${n} extra parts: ${w * d} + ${n} = ${w * d + n}. So ${w} ${n}/${d} = ${w * d + n}/${d}.`,
+      `${w} whole ${w === 1 ? "one is" : "ones are"} ${w} ${T} ${d} = ${w * d} parts of size 1/${d}. Add the ${n} extra ${n === 1 ? "part" : "parts"}: ${w * d} + ${n} = ${w * d + n}. So ${w} ${n}/${d} = ${w * d + n}/${d}.`,
   },
   {
     id: "u08-remaining-02",
@@ -213,10 +262,13 @@ export const UNIT_08: QuestionTemplate[] = [
     resource: "food",
     format: INT,
     params(rng) {
-      const b = int(rng, 3, 8);
-      const a = int(rng, 1, b - 2);
-      const c = int(rng, 1, b - a - 1);
-      return { a, b, c, k: int(rng, 2, 8) };
+      for (let i = 0; i < 100; i++) {
+        const b = int(rng, 4, 9);
+        const a = numer(rng, b);
+        const c = numer(rng, b);
+        if (a + c < b) return { a, b, c, k: int(rng, 2, 8) };
+      }
+      return { a: 1, b: 5, c: 2, k: 4 };
     },
     prompt: ({ a, b, c, k }, zone) =>
       `You gather ${b * k} ${Z[zone].food}. You eat ${a}/${b} of them and trade ${c}/${b} of them. How many ${Z[zone].food} do you have left?`,
@@ -234,15 +286,17 @@ export const UNIT_08: QuestionTemplate[] = [
     params(rng) {
       const b = int(rng, 2, 6);
       const d = int(rng, 2, 6);
-      return { a: int(rng, 1, b - 1), b, c: int(rng, 1, d - 1), d };
+      return { a: numer(rng, b), b, c: numer(rng, d), d, ...perm(rng, 5) };
     },
     prompt: ({ a, b, c, d }, zone) =>
       `${c}/${d} of a plot ${Z[zone].place} is cleared for ${Z[zone].stone}, and ${a}/${b} of that cleared part holds large ones. What fraction of the whole plot holds large ${Z[zone].stone}? ${SIMPLEST}`,
-    options: ({ a, b, c, d }) =>
-      withDistractors(fmt(a * c, b * d), [`${a * c}/${b + d}`, `${a + c}/${b * d}`, fmt(a * d, b * c), `${a * c}/${b * d + 1}`]),
+    options: (p) => {
+      const { a, b, c, d } = p;
+      return withDistractors(fmt(a * c, b * d), shuffledCands(p, [fmt(a * c, b + d), fmt(a + c, b * d), fmt(a * d, b * c), fmt(a * c, b * d + 1), fmt(a * c + 1, b * d)]));
+    },
     expected: ({ a, b, c, d }) => fmt(a * c, b * d),
     solution: ({ a, b, c, d }) =>
-      `"Of" means multiply: ${a}/${b} ${T} ${c}/${d}. Multiply the tops (${a} ${T} ${c} = ${a * c}) and the bottoms (${b} ${T} ${d} = ${b * d}), giving ${a * c}/${b * d} = ${fmt(a * c, b * d)}.`,
+      `"Of" means multiply: ${a}/${b} ${T} ${c}/${d}. Multiply the tops (${a} ${T} ${c} = ${a * c}) and the bottoms (${b} ${T} ${d} = ${b * d}), giving ${simp(a * c, b * d)}.`,
   },
   {
     id: "u08-divide-fraction-01",
@@ -307,13 +361,13 @@ export const UNIT_08: QuestionTemplate[] = [
     params(rng) {
       for (let i = 0; i < 100; i++) {
         const h = int(rng, 4, 96);
-        if (gcd(h, 100) > 1) return { h };
+        if (gcd(h, 100) > 1) return { h, ...perm(rng, 4) };
       }
-      return { h: 35 };
+      return { h: 35, ...perm(rng, 4) };
     },
     prompt: ({ h }, zone) =>
       `${Z[zone].Place}, a pot is ${(h / 100).toFixed(2)} full of ${Z[zone].food}. Write ${(h / 100).toFixed(2)} as a fraction in its simplest form.`,
-    options: ({ h }) => withDistractors(fmt(h, 100), [`${h}/100`, `1/${h}`, `${h}/10`, `${h}/1000`]),
+    options: (p) => withDistractors(fmt(p.h, 100), shuffledCands(p, [fmt(p.h, 10), fmt(p.h, 1000), `1/${p.h}`, fmt(100 - p.h, 100)])),
     expected: ({ h }) => fmt(h, 100),
     solution: ({ h }) =>
       `${(h / 100).toFixed(2)} means ${h} hundredths, which is ${h}/100. Divide the top and bottom by ${gcd(h, 100)}: ${fmt(h, 100)}.`,
@@ -328,7 +382,11 @@ export const UNIT_08: QuestionTemplate[] = [
     format: INT,
     params(rng) {
       const d = int(rng, 3, 9);
-      return { n: int(rng, 2, d - 1), d, k: int(rng, 2, 9) };
+      for (let i = 0; i < 50; i++) {
+        const n = int(rng, 2, d - 1);
+        if (gcd(n, d) === 1) return { n, d, k: int(rng, 2, 9) };
+      }
+      return { n: 2, d: 3, k: 4 };
     },
     prompt: ({ n, d, k }, zone) =>
       `${n}/${d} of your ${Z[zone].rope} is ${n * k} m long. How long was the whole length, in metres?`,
@@ -345,7 +403,11 @@ export const UNIT_08: QuestionTemplate[] = [
     params(rng) {
       const b = int(rng, 3, 6);
       const d = int(rng, 3, 5);
-      return { a: int(rng, 1, b - 2), b, c: int(rng, 1, d - 1), d, k: int(rng, 1, 4) };
+      for (let i = 0; i < 100; i++) {
+        const a = int(rng, 1, b - 2);
+        if (gcd(a, b) === 1) return { a, b, c: numer(rng, d), d, k: int(rng, 1, 4) };
+      }
+      return { a: 1, b, c: 1, d, k: 2 };
     },
     prompt: ({ a, b, c, d, k }, zone) =>
       `You start with ${b * d * k} litres of ${Z[zone].water}. On day 1 you use ${a}/${b} of it. On day 2 you use ${c}/${d} of what is left. How many litres remain?`,
@@ -361,25 +423,23 @@ export const UNIT_08: QuestionTemplate[] = [
     resource: "food",
     format: CHOICE,
     params(rng) {
-      for (let i = 0; i < 100; i++) {
-        const [b, d] = pick(rng, PAIRS);
-        const a = int(rng, 1, b - 1);
-        const c = int(rng, 1, d - 1);
-        const w1 = int(rng, 1, 4);
-        const w2 = int(rng, 1, 4);
-        const top = a * d + c * b;
-        if (top % (b * d) !== 0 && gcd(top, b * d) < b * d) return { w1, a, b, w2, c, d };
-      }
-      return { w1: 2, a: 1, b: 2, w2: 1, c: 3, d: 4 };
+      const [b, d] = pick(rng, PAIRS);
+      return { w1: int(rng, 1, 4), a: numer(rng, b), b, w2: int(rng, 1, 4), c: numer(rng, d), d, ...perm(rng, 4) };
     },
     prompt: ({ w1, a, b, w2, c, d }, zone) =>
       `${Z[zone].Place}, you carry ${w1} ${a}/${b} kg of ${Z[zone].food} to camp, then ${w2} ${c}/${d} kg more. How many kilograms is that in total? ${SIMPLEST}`,
-    options: ({ w1, a, b, w2, c, d }) => {
-      const top = a * d + c * b;
-      const right = fmt((w1 + w2) * b * d + top, b * d);
-      const whole = Math.floor(((w1 + w2) * b * d + top) / (b * d));
-      const rest = right.includes(" ") ? right.split(" ")[1] : right;
-      return withDistractors(right, [`${w1 + w2} ${a + c}/${b + d}`, `${whole + 1} ${rest}`, `${whole - 1} ${rest}`, `${w1 + w2} ${rest}`]);
+    options: (p) => {
+      const { w1, a, b, w2, c, d } = p;
+      const den = b * d;
+      const total = (w1 + w2) * den + a * d + c * b;
+      const whole = Math.floor(total / den);
+      const frac = fmt(total % den, den);
+      return withDistractors(fmt(total, den), shuffledCands(p, [
+        `${w1 + w2} ${fmt(a + c, b + d)}`,
+        `${whole + 1} ${frac}`,
+        `${whole - 1} ${frac}`,
+        `${w1 + w2} ${fmt(Math.abs(a * d - c * b), den)}`,
+      ]));
     },
     expected: ({ w1, a, b, w2, c, d }) => fmt((w1 + w2) * b * d + a * d + c * b, b * d),
     solution: ({ w1, a, b, w2, c, d }) =>
@@ -413,45 +473,40 @@ export const UNIT_08: QuestionTemplate[] = [
     difficulty: 3,
     resource: "stone",
     format: CHOICE,
-    params: (rng) => {
+    params(rng) {
       const [a, b, c, d] = pick(rng, BETWEEN);
       return { a, b, c, d };
     },
     prompt: ({ a, b, c, d }, zone) =>
       `A marker ${Z[zone].place} must be placed at a point strictly between ${a}/${b} and ${c}/${d} of the way along a trail. Which fraction is a possible place for the marker?`,
-    options: ({ a, b, c, d }) => [`${a + c}/${b + d}`, `${a}/${b + 1}`, `${2 * c + 1}/${2 * d}`, `${2 * c}/${2 * d}`],
-    expected: ({ a, b, c, d }) => `${a + c}/${b + d}`,
+    options: ({ a, b, c, d }) => withDistractors(fmt(a + c, b + d), [`${a}/${b + 1}`, fmt(2 * c + 1, 2 * d), `${2 * c}/${2 * d}`, fmt(a + 1, b)]),
+    expected: ({ a, b, c, d }) => fmt(a + c, b + d),
     solution: ({ a, b, c, d }) =>
       `Turn them into decimals: ${a}/${b} ≈ ${(a / b).toFixed(2)} and ${c}/${d} ≈ ${(c / d).toFixed(2)}. A fraction between them must be bigger than ${(a / b).toFixed(2)} and smaller than ${(c / d).toFixed(2)}. ` +
-      `${a + c}/${b + d} ≈ ${((a + c) / (b + d)).toFixed(2)} fits. (${a}/${b + 1} is too small, ${2 * c + 1}/${2 * d} is too big, and ${2 * c}/${2 * d} equals ${c}/${d}.) ` +
-      `The answer is ${a + c}/${b + d}.`,
+      `${fmt(a + c, b + d)} ≈ ${((a + c) / (b + d)).toFixed(2)} fits. (${a}/${b + 1} is too small, ${fmt(2 * c + 1, 2 * d)} is too big, and ${2 * c}/${2 * d} equals ${c}/${d}.) ` +
+      `The answer is ${fmt(a + c, b + d)}.`,
   },
   {
-    id: "u08-parts-compare-01",
+    id: "u08-mixed-multiply-01",
     unit: 8,
     difficulty: 3,
-    resource: "food",
-    format: INT,
+    resource: "wood",
+    format: CHOICE,
     params(rng) {
-      for (let i = 0; i < 100; i++) {
-        const b = int(rng, 3, 8);
-        const d = int(rng, 3, 8);
-        const a = int(rng, 1, b - 1);
-        const c = int(rng, 1, d - 1);
-        const k1 = int(rng, 2, 7);
-        const k2 = int(rng, 2, 7);
-        const x = a * k1;
-        const y = c * k2;
-        if (x > y) return { a, b, k1, c, d, k2 };
-      }
-      return { a: 3, b: 4, k1: 6, c: 1, d: 3, k2: 3 };
+      const b = int(rng, 2, 5);
+      const d = int(rng, 2, 5);
+      return { w1: int(rng, 1, 3), a: numer(rng, b), b, w2: int(rng, 1, 3), c: numer(rng, d), d, ...perm(rng, 4) };
     },
-    prompt: ({ a, b, k1, c, d, k2 }, zone) =>
-      `Team A catches ${b * k1} ${Z[zone].food} and Team B catches ${d * k2}. Team A trades ${a}/${b} of its catch and Team B trades ${c}/${d} of its catch. ` +
-      `How many more does Team A trade than Team B?`,
-    expected: ({ a, k1, c, k2 }) => a * k1 - c * k2,
-    solution: ({ a, b, k1, c, d, k2 }) =>
-      `Team A: ${a}/${b} of ${b * k1} = ${a} ${T} ${k1} = ${a * k1}. Team B: ${c}/${d} of ${d * k2} = ${c} ${T} ${k2} = ${c * k2}. ` +
-      `The difference is ${a * k1} ${M} ${c * k2} = ${a * k1 - c * k2}.`,
+    prompt: ({ w1, a, b, w2, c, d }, zone) =>
+      `A mat ${Z[zone].place} is ${w1} ${a}/${b} m long and ${w2} ${c}/${d} m wide. What area, in square metres, does it cover? ${SIMPLEST}`,
+    options: (p) => {
+      const { w1, a, b, w2, c, d } = p;
+      const top = (w1 * b + a) * (w2 * d + c);
+      const den = b * d;
+      return withDistractors(fmt(top, den), shuffledCands(p, [`${w1 * w2} ${fmt(a * c, den)}`, fmt(top + den, den), fmt(top - den, den), fmt(top + 1, den)]));
+    },
+    expected: ({ w1, a, b, w2, c, d }) => fmt((w1 * b + a) * (w2 * d + c), b * d),
+    solution: ({ w1, a, b, w2, c, d }) =>
+      `Change to improper fractions: ${w1} ${a}/${b} = ${w1 * b + a}/${b} and ${w2} ${c}/${d} = ${w2 * d + c}/${d}. Multiply the tops and the bottoms: ${(w1 * b + a) * (w2 * d + c)}/${b * d} = ${fmt((w1 * b + a) * (w2 * d + c), b * d)}.`,
   },
 ];

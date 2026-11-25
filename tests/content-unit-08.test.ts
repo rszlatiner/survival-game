@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_08 } from "@/content/units/unit-08";
-import { bankChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { rankChecks } from "./helpers/rank";
 
 bankChecks(8, UNIT_08);
+overlapChecks(UNIT_08);
+coordinateChecks(UNIT_08);
+rankChecks(UNIT_08);
 
 const get = (id: string) => UNIT_08.find((t) => t.id === id)!;
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
@@ -28,10 +32,11 @@ function isSimplest(s: string): boolean {
 describe("unit 8 independent recompute", () => {
   const run = (id: string, check: (prompt: string, expected: number | string, options: string[] | undefined, where: string) => void) =>
     eachQuestion(get(id), ({ publicQ, expected }, where) => check(publicQ.prompt, expected, publicQ.options, where));
-  /** The one option that is in simplest form and equals the value; others differ in value or form. */
+  /** The key is the only option with the right value, and it is in simplest form (a mixed number above 1); every option is in that form. */
   const onlyRight = (opts: string[] | undefined, value: [number, number], e: string | number, where: string) => {
-    const good = opts!.filter((o) => isSimplest(o) && same(parse(o), value));
-    expect(good, where).toEqual([e]);
+    expect(opts!.filter((o) => same(parse(o), value)), where).toEqual([e]);
+    expect(isSimplest(e as string), where).toBe(true);
+    for (const o of opts!) expect(isSimplest(o) || /^1\/\d+$/.test(o), `${where} ${o} not in simplest form`).toBe(true);
   };
 
   it("fraction-of-01", () =>
@@ -146,11 +151,12 @@ describe("unit 8 independent recompute", () => {
       };
       expect(opts!.filter(inside), where).toEqual([e]);
     }));
-  it("parts-compare-01", () =>
-    run("u08-parts-compare-01", (p, e) => {
-      const m = /catches (\d+) .*? and Team B catches (\d+)\. Team A trades (\d+)\/(\d+) .*? Team B trades (\d+)\/(\d+) of/.exec(p)!;
-      const [ta, tb, a, b, c, d] = m.slice(1).map(Number);
-      expect((ta * a) / b - (tb * c) / d).toBe(e);
-      expect(Number(e)).toBeGreaterThan(0);
+  it("mixed-multiply-01", () =>
+    run("u08-mixed-multiply-01", (p, e, opts, where) => {
+      const m = /is (\d+) (\d+)\/(\d+) m long and (\d+) (\d+)\/(\d+) m wide/.exec(p)!;
+      const [w1, a, b, w2, c, d] = m.slice(1).map(Number);
+      // Decimal check of the area, then the exact check.
+      onlyRight(opts, [(w1 * b + a) * (w2 * d + c), b * d], e, where);
+      expect(parse(e as string)[0] / parse(e as string)[1]).toBeCloseTo((w1 + a / b) * (w2 + c / d), 9);
     }));
 });
