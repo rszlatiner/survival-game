@@ -210,3 +210,11 @@ describe("teams 1..8", () => {
     }
   });
 });
+
+describe("contribute after a tie is declared (fix wave I1)", () => {
+  it("is rejected with WRONG_PHASE while tiedIds is non-empty", () => {
+    const g = { ...revealGame(), tiedIds: ["t1", "t2"] };
+    expect(errCode(() => contribute(g, "t1", "water", 1))).toBe("WRONG_PHASE");
+    expect(contribute({ ...g, tiedIds: [] }, "t1", "water", 1).fund.water).toBe(1);
+  });
+});

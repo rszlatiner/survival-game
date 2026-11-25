@@ -136,3 +136,34 @@ export function suggestAnswer(g: GameState, teamId: string, deviceId: string, an
     },
   });
 }
+
+/**
+ * Teacher's "Reset devices": removes every device of a team except the first
+ * one (device index 0, the team's creator), which becomes the captain. Stock,
+ * builds and SP are kept. Removed devices lose their team token's access and
+ * may join another team; their suggestions in an open round are dropped.
+ * A team with one device is unchanged. Logged. Not allowed once finished.
+ */
+export function resetDevices(g: GameState, teamId: string): GameState {
+  if (g.phase === "finished") throw new GameError("WRONG_PHASE");
+  const t = g.teams.find((x) => x.id === teamId);
+  if (!t) throw new GameError("NOT_FOUND", `team ${teamId}`);
+  if (t.devices.length <= 1) return g;
+  const keep = t.devices.slice(0, 1);
+  const removed = t.devices.length - keep.length;
+  const next: Team = { ...t, devices: keep, captainIndex: 0 };
+  const round = g.round?.suggestions[teamId]
+    ? {
+        ...g.round,
+        suggestions: {
+          ...g.round.suggestions,
+          [teamId]: g.round.suggestions[teamId].filter((s) => keep.includes(s.deviceId)),
+        },
+      }
+    : g.round;
+  return bump(g, {
+    teams: g.teams.map((x) => (x.id === teamId ? next : x)),
+    round,
+    log: [...g.log, `reset devices ${teamId} (${removed} removed)`],
+  });
+}

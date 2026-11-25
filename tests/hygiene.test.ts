@@ -21,3 +21,11 @@ describe("repository", () => {
     expect(find(tracked)).toEqual([]);
   });
 });
+
+describe("server-only guard", () => {
+  it("lib/api/server.ts (service-role wiring) is marked server-only", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync(new URL("../lib/api/server.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/^import "server-only";$/m);
+  });
+});

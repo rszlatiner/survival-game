@@ -7,8 +7,8 @@
  *   LOADCHECK_TEACHER_PASSWORD=... npm run loadcheck -- https://your-app.vercel.app ABC234
  *   LOADCHECK_HOST_TOKEN=...       npm run loadcheck -- https://your-app.vercel.app ABC234 [clients=30] [samples=5] [pollMs=2000]
  *
- * 1. Create a throwaway game on the deployed site, add a team and press Next
- *    round so it is in the question phase (the check uses the teacher's
+ * 1. Create a throwaway game on the deployed site, add a team and press Start
+ *    game (it opens round 1) so it is in the question phase (the check uses the teacher's
  *    "extend timer by 1 second" action, which only works there).
  * 2. Give the teacher password (or a host token) in an environment variable,
  *    never on the command line. The script signs in with it, keeps the token
@@ -22,7 +22,10 @@
  *    for each one times how long every client takes to see the new version.
  *
  * Prints p50, p95 and max delay in ms and exits 1 if p95 > 3000 ms (or if a
- * client never saw a change within 10 s, counted as 10 000 ms).
+ * client never saw a change within 10 s, counted as 10 000 ms). If no client
+ * gets a version from the state endpoint in its first round of polls (wrong
+ * URL or code, site down), it says so and exits 3 instead, so a broken setup
+ * is never mistaken for a slow one.
  */
 import { pathToFileURL } from "node:url";
 
@@ -59,11 +62,25 @@ export function summarizeDelays(delays: number[]): DelaySummary {
   };
 }
 
+/** Exit code when the state endpoint gave no version at all (distinct from 1 = p95 failure, 2 = usage). */
+export const UNREACHABLE_EXIT = 3;
+
+/** True once every client has polled at least once and none has ever read a version. */
+export function stateUnreachable(clients: { polls: number; version: number }[]): boolean {
+  return clients.length > 0 && clients.every((c) => c.polls > 0 && c.version < 0);
+}
+
+export function unreachableMessage(stateUrl: string): string {
+  return `state endpoint unreachable: check URL/code (no client read a version from ${stateUrl})`;
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Client {
-  /** Highest version seen so far, and when each version was first seen. */
+  /** Highest version seen so far (-1 before any), and when each version was first seen. */
   version: number;
+  /** Finished polls, successful or not. */
+  polls: number;
   seenAt: Map<number, number>;
   stop(): void;
 }
@@ -80,10 +97,11 @@ async function fetchVersion(stateUrl: string): Promise<number | null> {
 }
 
 async function startClient(stateUrl: string, code: string, pollMs: number, offsetMs: number): Promise<Client> {
-  const client: Client = { version: -1, seenAt: new Map(), stop: () => {} };
+  const client: Client = { version: -1, polls: 0, seenAt: new Map(), stop: () => {} };
   let stopped = false;
   const load = async () => {
     const v = await fetchVersion(stateUrl);
+    client.polls++;
     if (v === null || v <= client.version) return;
     const t = Date.now();
     for (let k = client.version + 1; k <= v; k++) if (!client.seenAt.has(k)) client.seenAt.set(k, t);
@@ -157,6 +175,14 @@ async function main() {
   );
   console.log(`${clients} clients polling every ${pollMs} ms${process.env.NEXT_PUBLIC_SUPABASE_URL ? " with Broadcast" : ""}.`);
   await sleep(pollMs + 500);
+  // Wait for the first full round of polls, then make sure the endpoint answers at all.
+  const firstRound = Date.now() + SEEN_TIMEOUT_MS;
+  while (Date.now() < firstRound && pool.some((c) => c.polls === 0)) await sleep(50);
+  if (stateUnreachable(pool)) {
+    for (const c of pool) c.stop();
+    console.error(unreachableMessage(stateUrl));
+    process.exit(UNREACHABLE_EXIT);
+  }
 
   const delays: number[] = [];
   try {

@@ -1,3 +1,4 @@
+import "server-only";
 import { supabaseRepo } from "@/lib/repo/supabase";
 import { supabaseNotifier } from "@/lib/repo/notify";
 import type { GameRepo } from "@/lib/repo/types";

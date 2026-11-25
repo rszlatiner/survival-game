@@ -9,7 +9,8 @@ function bump(g: GameState, patch: Partial<GameState>): GameState {
 }
 
 function revealTeam(g: GameState, teamId: string): Team {
-  if (g.phase !== "reveal") throw new GameError("WRONG_PHASE");
+  // Once a tie is declared the scores are frozen until the tiebreak question decides it.
+  if (g.phase !== "reveal" || g.tiedIds.length > 0) throw new GameError("WRONG_PHASE");
   const t = g.teams.find((x) => x.id === teamId);
   if (!t) throw new GameError("NOT_FOUND", `team ${teamId}`);
   return t;

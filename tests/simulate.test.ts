@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { UNIT_BANKS } from "@/content/units";
 import { ROUNDS } from "@/lib/config";
 import { simulateGame, simulateMany, summarize, type SimResult } from "@/scripts/simulate";
-import { percentile, summarizeDelays } from "@/scripts/loadcheck";
+import { UNREACHABLE_EXIT, percentile, stateUnreachable, summarizeDelays, unreachableMessage } from "@/scripts/loadcheck";
 
 /**
  * Whole-game balance checks (Task 15). Every game drives the real handlers
@@ -31,6 +31,14 @@ describe("simulateGame", () => {
     expect(a).toEqual(b);
     const c = await simulateGame({ ...opts, seed: "det-2" });
     expect(c.actions).toBeGreaterThan(0);
+  });
+
+  it("different seeds give different games", async () => {
+    const opts = { teams: 5, length: "standard" as const, accuracy: 0.8 };
+    const runs = await Promise.all(["vary-1", "vary-2", "vary-3", "vary-4"].map((seed) => simulateGame({ ...opts, seed })));
+    // Compare everything but the seed label itself.
+    const shapes = new Set(runs.map(({ seed: _s, ...rest }) => JSON.stringify(rest)));
+    expect(shapes.size).toBeGreaterThan(1);
   });
 
   it(`${GAMES} quick games of 5 teams: one winner each, at most 6 rounds, no negative resource`, async () => {
@@ -117,5 +125,21 @@ describe("loadcheck helpers", () => {
     expect(slower.ok).toBe(false);
     expect(summarizeDelays([]).ok).toBe(false);
     expect(summarizeDelays([3000]).ok).toBe(true);
+  });
+});
+
+describe("loadcheck reachability (fix wave)", () => {
+  it("stateUnreachable is true only when every client has polled and none ever got a version", () => {
+    expect(stateUnreachable([{ polls: 1, version: -1 }, { polls: 2, version: -1 }])).toBe(true);
+    expect(stateUnreachable([{ polls: 1, version: -1 }, { polls: 1, version: 4 }])).toBe(false);
+    expect(stateUnreachable([{ polls: 0, version: -1 }, { polls: 1, version: -1 }])).toBe(false); // not a full round yet
+    expect(stateUnreachable([])).toBe(false);
+  });
+
+  it("has its own exit code, distinct from the p95 failure (1) and usage (2)", () => {
+    expect(UNREACHABLE_EXIT).not.toBe(0);
+    expect(UNREACHABLE_EXIT).not.toBe(1);
+    expect(UNREACHABLE_EXIT).not.toBe(2);
+    expect(unreachableMessage("https://x.example/api/games/ABC234/state")).toMatch(/^state endpoint unreachable: check URL\/code/);
   });
 });

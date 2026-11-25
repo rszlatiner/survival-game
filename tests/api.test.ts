@@ -15,6 +15,8 @@ import { parseCreateBody, parseHostAction, parseLoginBody, parseTeamAction } fro
 import { signToken, verifyToken } from "@/lib/auth";
 import { ROUNDS } from "@/lib/config";
 import { checkWinner } from "@/lib/engine/win";
+import { GameError, addTeam, createGame, startGame } from "@/lib/engine/game";
+import { errorBody, toApiError } from "@/lib/api/errors";
 import { memoryRepo } from "@/lib/repo/memory";
 import { VersionConflict, type GameRepo } from "@/lib/repo/types";
 import type { Notifier } from "@/lib/repo/notify";
@@ -35,8 +37,15 @@ function makeEnv(notifier?: Notifier) {
       return true;
     },
   };
-  const env: HandlerEnv = { teacherPassword: PASSWORD, tokenSecret: SECRET, notifier: n };
-  return { env, calls };
+  const sleeps: number[] = [];
+  const env: HandlerEnv = {
+    teacherPassword: PASSWORD,
+    tokenSecret: SECRET,
+    notifier: n,
+    // Conflict retries back off without real waiting; delays are recorded.
+    retry: { sleep: async (ms) => void sleeps.push(ms), rand: () => 0.5 },
+  };
+  return { env, calls, sleeps };
 }
 
 /** Run `fn` and return the ApiError it rejects with. */
@@ -78,9 +87,10 @@ describe("full flow through the handlers", () => {
     }
     expect(teams.map((t) => t.teamId)).toEqual(["t1", "t2", "t3", "t4", "t5"]);
 
-    await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0);
-    const q = await hostActionHandler(repo, env, code, hostToken, { type: "next" }, T0);
+    // One press of Start locks the lobby and opens round 1.
+    const q = await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0);
     expect(q.phase).toBe("question");
+    expect(q.round!.n).toBe(1);
 
     const stored = (await repo.get(code))!;
     for (const t of teams) {
@@ -210,7 +220,6 @@ describe("state and errors", () => {
     const a = await joinHandler(repo, env, code, { teamName: "A", deviceId: "cap" }, T0);
     const b = await joinHandler(repo, env, code, { teamId: a.teamId, deviceId: "mate" }, T0);
     await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0);
-    await hostActionHandler(repo, env, code, hostToken, { type: "next" }, T0);
     const e = await apiErr(teamActionHandler(repo, env, code, b.teamToken, { type: "submit", answer: "1" }, T0 + 1));
     expect(e.status).toBe(400);
     expect(e.code).toBe("NOT_CAPTAIN");
@@ -222,7 +231,6 @@ describe("state and errors", () => {
     const { code, hostToken } = await newGame(repo, env);
     await joinHandler(repo, env, code, { teamName: "A", deviceId: "d" }, T0);
     await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0);
-    await hostActionHandler(repo, env, code, hostToken, { type: "next" }, T0);
     const r = await hostActionHandler(repo, env, code, hostToken, { type: "reveal" }, T0);
     expect(r.phase).toBe("reveal");
     expect(r.round!.results!.t1.correct).toBe(false);
@@ -234,7 +242,6 @@ describe("state and errors", () => {
     const { code, hostToken } = await newGame(repo, env);
     await joinHandler(repo, env, code, { teamName: "A", deviceId: "d" }, T0);
     await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0);
-    await hostActionHandler(repo, env, code, hostToken, { type: "next" }, T0);
     const before = await repo.get(code);
     const e = await apiErr(hostActionHandler(repo, env, code, hostToken, { type: "next" }, T0));
     expect(e.status).toBe(400);
@@ -275,7 +282,6 @@ describe("state and errors", () => {
     const { code, hostToken } = await newGame(repo, env);
     const a = await joinHandler(repo, env, code, { teamName: "A", deviceId: "d" }, T0);
     await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0);
-    await hostActionHandler(repo, env, code, hostToken, { type: "next" }, T0);
     const e = await apiErr(teamActionHandler(repo, env, code, a.teamToken, { type: "submit", answer: "9".repeat(41) }, T0));
     expect(e.status).toBe(400);
     expect(() => parseTeamAction({ type: "submit", answer: "9".repeat(41) })).toThrow(ApiError);
@@ -423,9 +429,9 @@ describe("persistence rulings", () => {
     expect((await repo.get(code))!.teams.map((t) => t.name)).toEqual(["Other", "Mine"]);
   });
 
-  it("gives 409 after a second VersionConflict, with the current state", async () => {
+  it("gives 409 after the fourth VersionConflict, with the current state", async () => {
     const repo = memoryRepo();
-    const { env } = makeEnv();
+    const { env, sleeps } = makeEnv();
     const { code } = await newGame(repo, env);
     let saves = 0;
     const always: GameRepo = {
@@ -437,7 +443,9 @@ describe("persistence rulings", () => {
     };
     const e = await apiErr(joinHandler(always, env, code, { teamName: "A", deviceId: "d" }, T0));
     expect(e.status).toBe(409);
-    expect(saves).toBe(2);
+    expect(e.code).toBe("CONFLICT");
+    expect(saves).toBe(4);
+    expect(sleeps).toHaveLength(3);
     expect(e.state?.version).toBe(0);
   });
 
@@ -473,7 +481,6 @@ describe("suggestions and leaks", () => {
     const b = await joinHandler(repo, env, code, { teamName: "B", deviceId: "capB" }, T0);
     const b2 = await joinHandler(repo, env, code, { teamId: b.teamId, deviceId: "mateB" }, T0);
     await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0);
-    await hostActionHandler(repo, env, code, hostToken, { type: "next" }, T0);
     return { repo, env, code, hostToken, a, a2, b, b2 };
   }
 
@@ -612,5 +619,149 @@ describe("host login", () => {
     for (const b of [{}, { password: "" }, { password: "x".repeat(201) }, { password: 5 }, null]) {
       expect(() => parseLoginBody(b)).toThrow();
     }
+  });
+});
+
+describe("host start opens round 1 (fix wave C1)", () => {
+  it("one Start from the lobby gives the question phase of round 1", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code, hostToken } = await newGame(repo, env);
+    await joinHandler(repo, env, code, { teamName: "A", deviceId: "d" }, T0);
+    const s = await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0);
+    expect(s.phase).toBe("question");
+    expect(s.round!.n).toBe(1);
+    expect(s.round!.questions.t1).toBeDefined();
+    const stored = (await repo.get(code))!;
+    expect(stored.log).toContain("game started");
+  });
+
+  it("a second Start (double click) is a harmless WRONG_PHASE that changes nothing", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code, hostToken } = await newGame(repo, env);
+    await joinHandler(repo, env, code, { teamName: "A", deviceId: "d" }, T0);
+    await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0);
+    const before = await repo.get(code);
+    const e = await apiErr(hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0));
+    expect(e.code).toBe("WRONG_PHASE");
+    expect(await repo.get(code)).toEqual(before);
+  });
+
+  it("a lobby game that is already locked (an earlier partial start) also proceeds to round 1", async () => {
+    let g = createGame({ units: [11], length: "quick", timerSeconds: 60, seed: "s", code: "ABC234", now: T0 });
+    g = addTeam(g, "A", "d0").g;
+    g = startGame(g);
+    expect(g.phase).toBe("lobby");
+    const { repo, env, host } = await seeded(g);
+    const s = await hostActionHandler(repo, env, g.code, host, { type: "start" }, T0);
+    expect(s.phase).toBe("question");
+    expect(s.round!.n).toBe(1);
+  });
+
+  it("Start with no teams is NO_TEAMS", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code, hostToken } = await newGame(repo, env);
+    expect((await apiErr(hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0))).code).toBe("NO_TEAMS");
+  });
+});
+
+describe("one team per device (fix wave I2)", () => {
+  it("joining a different team with the same device is a 409 ALREADY_ON_TEAM; same-team rejoin is fine", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code } = await newGame(repo, env);
+    const a = await joinHandler(repo, env, code, { teamName: "A", deviceId: "d" }, T0);
+    const b = await joinHandler(repo, env, code, { teamName: "B", deviceId: "other" }, T0);
+    const byId = await apiErr(joinHandler(repo, env, code, { teamId: b.teamId, deviceId: "d" }, T0));
+    expect(byId.status).toBe(409);
+    expect(byId.code).toBe("ALREADY_ON_TEAM");
+    const byName = await apiErr(joinHandler(repo, env, code, { teamName: "C", deviceId: "d" }, T0));
+    expect(byName.code).toBe("ALREADY_ON_TEAM");
+    expect((await joinHandler(repo, env, code, { teamId: a.teamId, deviceId: "d" }, T0)).deviceIndex).toBe(0);
+  });
+
+  it("toApiError maps ALREADY_ON_TEAM to 409", () => {
+    const e = toApiError(new GameError("ALREADY_ON_TEAM"));
+    expect(e.status).toBe(409);
+    expect(errorBody(e)).toEqual({ error: "ALREADY_ON_TEAM" });
+  });
+
+  it("host resetDevices keeps device 0, cuts off the others, and frees them to join another team", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code, hostToken } = await newGame(repo, env);
+    const a = await joinHandler(repo, env, code, { teamName: "A", deviceId: "cap" }, T0);
+    const mate = await joinHandler(repo, env, code, { teamId: a.teamId, deviceId: "mate" }, T0);
+    const b = await joinHandler(repo, env, code, { teamName: "B", deviceId: "b0" }, T0);
+    const s = await hostActionHandler(repo, env, code, hostToken, { type: "resetDevices", teamId: a.teamId }, T0);
+    expect(s.teams.find((t) => t.id === a.teamId)!.deviceCount).toBe(1);
+    expect((await repo.get(code))!.log).toContain(`reset devices ${a.teamId} (1 removed)`);
+    expect((await apiErr(teamSuggestionsHandler(repo, env, code, mate.teamToken, T0))).status).toBe(401);
+    await expect(teamSuggestionsHandler(repo, env, code, a.teamToken, T0)).resolves.toEqual({ suggestions: [] });
+    expect((await joinHandler(repo, env, code, { teamId: b.teamId, deviceId: "mate" }, T0)).deviceIndex).toBe(1);
+  });
+
+  it("parseHostAction accepts resetDevices with a team id only", () => {
+    expect(parseHostAction({ type: "resetDevices", teamId: "t1" })).toEqual({ type: "resetDevices", teamId: "t1" });
+    expect(() => parseHostAction({ type: "resetDevices" })).toThrow(ApiError);
+  });
+});
+
+describe("conflict retries (fix wave I3)", () => {
+  /** A repo whose first `n` saves lose the race (throw VersionConflict) before succeeding. */
+  function flaky(repo: GameRepo, n: number) {
+    let saves = 0;
+    const r: GameRepo = {
+      ...repo,
+      async save(g, v) {
+        saves++;
+        if (saves <= n) throw new VersionConflict(g.code, v);
+        return repo.save(g, v);
+      },
+    };
+    return { r, saves: () => saves };
+  }
+
+  it("succeeds on the 2nd attempt after one jittered wait", async () => {
+    const repo = memoryRepo();
+    const { env, sleeps } = makeEnv();
+    const { code } = await newGame(repo, env);
+    const f = flaky(repo, 1);
+    await expect(joinHandler(f.r, env, code, { teamName: "A", deviceId: "d" }, T0)).resolves.toMatchObject({ teamId: "t1" });
+    expect(f.saves()).toBe(2);
+    expect(sleeps).toHaveLength(1);
+  });
+
+  it("succeeds on the 3rd attempt", async () => {
+    const repo = memoryRepo();
+    const { env, sleeps } = makeEnv();
+    const { code } = await newGame(repo, env);
+    const f = flaky(repo, 2);
+    await expect(joinHandler(f.r, env, code, { teamName: "A", deviceId: "d" }, T0)).resolves.toMatchObject({ teamId: "t1" });
+    expect(f.saves()).toBe(3);
+    expect(sleeps).toHaveLength(2);
+    expect((await repo.get(code))!.teams).toHaveLength(1);
+  });
+
+  it("waits between 20 and 80 ms, chosen by the injected random source", async () => {
+    for (const [rand, want] of [[0, 20], [0.999999, 80], [0.5, 50]] as const) {
+      const repo = memoryRepo();
+      const { env } = makeEnv();
+      const waits: number[] = [];
+      const e2 = { ...env, retry: { sleep: async (ms: number) => void waits.push(ms), rand: () => rand } };
+      const { code } = await newGame(repo, e2);
+      await joinHandler(flaky(repo, 3).r, e2, code, { teamName: "A", deviceId: "d" }, T0);
+      expect(waits).toEqual([want, want, want]);
+    }
+  });
+
+  it("an engine error is not retried", async () => {
+    const repo = memoryRepo();
+    const { env, sleeps } = makeEnv();
+    const { code, hostToken } = await newGame(repo, env);
+    expect((await apiErr(hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0))).code).toBe("NO_TEAMS");
+    expect(sleeps).toHaveLength(0);
   });
 });

@@ -22,10 +22,15 @@ export class ApiError extends Error {
   }
 }
 
-/** Maps anything thrown inside a handler to an ApiError (engine 400/404, conflict 409, else 500). */
+/** Engine codes that mean "clashes with the current state" rather than "bad request". */
+const CONFLICT_CODES = new Set<string>(["ALREADY_ON_TEAM"]);
+
+/** Maps anything thrown inside a handler to an ApiError (engine 400/404, ALREADY_ON_TEAM and conflicts 409, else 500). */
 export function toApiError(e: unknown): ApiError {
   if (e instanceof ApiError) return e;
-  if (e instanceof GameError) return new ApiError(e.code === "NOT_FOUND" ? 404 : 400, e.code);
+  if (e instanceof GameError) {
+    return new ApiError(e.code === "NOT_FOUND" ? 404 : CONFLICT_CODES.has(e.code) ? 409 : 400, e.code);
+  }
   if (e instanceof VersionConflict) return new ApiError(409, "CONFLICT");
   return new ApiError(500, "INTERNAL");
 }

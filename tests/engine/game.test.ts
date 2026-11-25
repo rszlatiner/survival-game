@@ -12,6 +12,8 @@ import {
   removeTeam,
   isLocked,
 } from "@/lib/engine/game";
+import { resetDevices } from "@/lib/engine/host";
+import { questionGame } from "../helpers/game";
 import { makeRng } from "@/lib/rng";
 import { ZONE_IDS } from "@/lib/questions/types";
 import { START_STOCK } from "@/lib/config";
@@ -195,5 +197,50 @@ describe("purity", () => {
       expect(out).not.toBe(g0);
       expect(out.version).toBe(g0.version + deltas[i]);
     });
+  });
+});
+
+describe("one team per device (fix wave I2)", () => {
+  it("joinTeam rejects a device already on a different team; same-team rejoin stays a no-op", () => {
+    const g = withTeams(2); // t1 has d0, t2 has d1
+    expect(code(() => joinTeam(g, "t2", "d0"))).toBe("ALREADY_ON_TEAM");
+    expect(joinTeam(g, "t1", "d0")).toBe(g);
+    const s = startGame(g);
+    expect(code(() => joinTeam(s, "t1", "d1"))).toBe("ALREADY_ON_TEAM");
+  });
+  it("addTeam rejects a device already on a team", () => {
+    expect(code(() => addTeam(withTeams(1), "Second", "d0"))).toBe("ALREADY_ON_TEAM");
+  });
+});
+
+describe("resetDevices (fix wave I2)", () => {
+  it("keeps only device 0, makes it captain, keeps stock and SP, and logs", () => {
+    let g = withTeams(2);
+    g = joinTeam(joinTeam(g, "t1", "x1"), "t1", "x2");
+    g = setCaptain(g, "t1", 2);
+    g = { ...g, teams: g.teams.map((t) => (t.id === "t1" ? { ...t, sp: 4, stock: { ...t.stock, wood: 9 } } : t)) };
+    const n = resetDevices(g, "t1");
+    const t1 = n.teams.find((t) => t.id === "t1")!;
+    expect(t1.devices).toEqual(["d0"]);
+    expect(t1.captainIndex).toBe(0);
+    expect(t1.sp).toBe(4);
+    expect(t1.stock.wood).toBe(9);
+    expect(n.teams.find((t) => t.id === "t2")).toEqual(g.teams.find((t) => t.id === "t2"));
+    expect(n.version).toBe(g.version + 1);
+    expect(n.log[n.log.length - 1]).toBe("reset devices t1 (2 removed)");
+    // A removed device may now join another team.
+    expect(joinTeam(n, "t2", "x1").teams[1].devices).toEqual(["d1", "x1"]);
+  });
+  it("is a no-op with one device, rejects unknown teams and a finished game", () => {
+    const g = withTeams(1);
+    expect(resetDevices(g, "t1")).toBe(g);
+    expect(code(() => resetDevices(g, "zz"))).toBe("NOT_FOUND");
+    const f = { ...joinTeam(g, "t1", "x"), phase: "finished" as const };
+    expect(code(() => resetDevices(f, "t1"))).toBe("WRONG_PHASE");
+  });
+  it("drops the removed devices' suggestions in an open round", () => {
+    let g = joinTeam(questionGame(1), "t1", "x1");
+    g = { ...g, round: { ...g.round!, suggestions: { t1: [{ deviceId: "x1", answer: "3" }, { deviceId: "d0", answer: "4" }] } } };
+    expect(resetDevices(g, "t1").round!.suggestions.t1).toEqual([{ deviceId: "d0", answer: "4" }]);
   });
 });

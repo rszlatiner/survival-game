@@ -32,9 +32,10 @@ function hit(t: Team): Team {
   return { ...t, stock: { ...t.stock, [r]: t.stock[r] - lose } };
 }
 
-/** Moves `amount` of a team's `res` into the island fund (reveal phase only). */
+/** Moves `amount` of a team's `res` into the island fund (reveal phase only, and not once a tie is declared). */
 export function contribute(g: GameState, teamId: string, res: Resource, amount: number): GameState {
-  if (g.phase !== "reveal") throw new GameError("WRONG_PHASE");
+  // A declared tie freezes stock until the tiebreak question decides it.
+  if (g.phase !== "reveal" || g.tiedIds.length > 0) throw new GameError("WRONG_PHASE");
   const t = g.teams.find((x) => x.id === teamId);
   if (!t) throw new GameError("NOT_FOUND", `team ${teamId}`);
   if (!Number.isInteger(amount) || amount <= 0) throw new GameError("BAD_AMOUNT", String(amount));

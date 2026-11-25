@@ -193,3 +193,16 @@ describe("property: random build/exchange attempts", () => {
     expect(ok).toBeGreaterThan(10);
   });
 });
+
+describe("after a tie is declared (fix wave I1)", () => {
+  it("rejects build and exchange with WRONG_PHASE while tiedIds is non-empty", () => {
+    const g = { ...revealWith(rich), tiedIds: ["t1", "t2"] };
+    const id = g.teams[0].id;
+    expect(errCode(() => buildItem(g, id, "shelter"))).toBe("WRONG_PHASE");
+    expect(errCode(() => exchange(g, id, "wood", "stone", 1))).toBe("WRONG_PHASE");
+    // Without the tie the same moves are allowed.
+    const free = { ...g, tiedIds: [] };
+    expect(buildItem(free, id, "shelter").teams[0].builds).toEqual(["shelter"]);
+    expect(exchange(free, id, "wood", "stone", 1).version).toBe(free.version + 1);
+  });
+});

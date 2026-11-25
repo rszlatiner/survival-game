@@ -6,13 +6,14 @@ import {
   createGame,
   generateCode,
   joinTeam,
+  isLocked,
   removeTeam,
   renameTeam,
   setCaptain,
   startGame,
 } from "@/lib/engine/game";
 import { contribute, resolveHazard, resolveRaider } from "@/lib/engine/hazard";
-import { endGame, extendTimer, overrideTeam, skipQuestion, suggestAnswer } from "@/lib/engine/host";
+import { endGame, extendTimer, overrideTeam, resetDevices, skipQuestion, suggestAnswer } from "@/lib/engine/host";
 import { toPublicState, type PublicGameState } from "@/lib/engine/public";
 import { revealRound, startRound, submitAnswer } from "@/lib/engine/round";
 import { checkRaft, checkWinner, finishTiebreak, startTiebreak } from "@/lib/engine/win";
@@ -39,7 +40,7 @@ export type { CreateBody, HostAction, JoinBody, TeamAction } from "./parse";
 
 /**
  * Framework-free request handlers: each loads the game, applies engine
- * functions, saves with the version check (retrying once on a conflict),
+ * functions, saves with the version check (retrying a few times on a conflict),
  * then pings browsers. Every result a browser sees comes from toPublicState.
  */
 
@@ -47,6 +48,21 @@ export interface HandlerEnv {
   teacherPassword: string;
   tokenSecret: string;
   notifier: Notifier;
+  /** Backoff between conflict retries; injectable so tests are fast and deterministic. */
+  retry?: { sleep?: (ms: number) => Promise<void>; rand?: () => number };
+}
+
+/** Save attempts on a VersionConflict before giving up with 409. */
+export const SAVE_ATTEMPTS = 4;
+export const RETRY_MIN_MS = 20;
+export const RETRY_MAX_MS = 80;
+
+const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Jittered wait in [RETRY_MIN_MS, RETRY_MAX_MS] from a random number in [0, 1). */
+export function retryDelay(rand: number): number {
+  const span = RETRY_MAX_MS - RETRY_MIN_MS + 1;
+  return RETRY_MIN_MS + Math.min(span - 1, Math.max(0, Math.floor(rand * span)));
 }
 
 /** Token lifetime: 24 hours, the maximum the project allows (games themselves are deleted after 24 hours). */
@@ -91,8 +107,9 @@ async function publicOrNull(repo: GameRepo, code: string, now: number): Promise<
 
 /**
  * Load, apply, save. `apply` must be pure in the loaded state (it is re-run on
- * a VersionConflict). An unchanged result (same object or same version) is not
- * saved and nobody is notified. Returns the state now stored.
+ * a VersionConflict, up to SAVE_ATTEMPTS saves in all, with a jittered 20-80 ms
+ * wait before each retry). An unchanged result (same object or same version)
+ * is not saved and nobody is notified. Returns the state now stored.
  */
 async function mutate(
   repo: GameRepo,
@@ -109,7 +126,10 @@ async function mutate(
     try {
       await repo.save(next, g.version);
     } catch (e) {
-      if (e instanceof VersionConflict && attempt === 0) continue;
+      if (e instanceof VersionConflict && attempt < SAVE_ATTEMPTS - 1) {
+        await (env.retry?.sleep ?? realSleep)(retryDelay((env.retry?.rand ?? Math.random)()));
+        continue;
+      }
       // Re-read so the caller sees the true stored state, then report.
       const state = await publicOrNull(repo, code, now);
       if (e instanceof VersionConflict) throw new ApiError(409, "CONFLICT", undefined, state);
@@ -223,6 +243,16 @@ export function joinHandler(
 }
 
 /**
+ * Host "start": locks the lobby (zones assigned) and opens round 1 in one step,
+ * so the teacher sees the question phase at once. A lobby game that is already
+ * locked (an earlier partial start) goes straight to round 1; anything else
+ * (a double click once the round is open) is WRONG_PHASE and changes nothing.
+ */
+function start(g: GameState, now: number): GameState {
+  return startRound(isLocked(g) ? g : startGame(g), now);
+}
+
+/**
  * Host "next": from the lobby, round 1. From reveal: a pending tie starts the
  * tiebreak; otherwise settle this round's hazard, check the winner (on the last
  * round that is endRoundIfLast, i.e. final scoring), then start the next round,
@@ -246,7 +276,7 @@ function reveal(g: GameState): GameState {
 function applyHost(g: GameState, a: HostAction, now: number): GameState {
   switch (a.type) {
     case "start":
-      return startGame(g);
+      return start(g, now);
     case "next":
       return next(g, now);
     case "reveal":
@@ -265,6 +295,8 @@ function applyHost(g: GameState, a: HostAction, now: number): GameState {
       return removeTeam(g, a.teamId);
     case "override":
       return overrideTeam(g, a.teamId, { stock: a.stock, sp: a.sp });
+    case "resetDevices":
+      return resetDevices(g, a.teamId);
   }
 }
 

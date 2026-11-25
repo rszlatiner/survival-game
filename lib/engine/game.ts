@@ -21,7 +21,8 @@ export type GameErrorCode =
   | "MISSING_REQUIREMENT"
   | "BAD_AMOUNT"
   | "SAME_RESOURCE"
-  | "BAD_ANSWER";
+  | "BAD_ANSWER"
+  | "ALREADY_ON_TEAM";
 
 export class GameError extends Error {
   code: GameErrorCode;
@@ -104,6 +105,11 @@ export function generateCode(rng: () => number, taken: Set<string>): string {
   }
 }
 
+/** A device may belong to one team only: throws ALREADY_ON_TEAM if it is on a team other than `teamId`. */
+function assertNotOnOtherTeam(g: GameState, deviceId: string, teamId?: string): void {
+  if (g.teams.some((t) => t.id !== teamId && t.devices.includes(deviceId))) throw new GameError("ALREADY_ON_TEAM");
+}
+
 export function addTeam(
   g: GameState,
   name: string,
@@ -111,6 +117,7 @@ export function addTeam(
 ): { g: GameState; teamId: string } {
   if (isLocked(g)) throw new GameError("LOCKED");
   const clean = cleanName(name);
+  assertNotOnOtherTeam(g, deviceId);
   if (g.teams.length >= MAX_TEAMS) throw new GameError("TOO_MANY_TEAMS");
   const maxId = g.teams.reduce((m, t) => Math.max(m, Number(t.id.slice(1)) || 0), 0);
   const teamId = `t${maxId + 1}`;
@@ -134,6 +141,7 @@ export function joinTeam(g: GameState, teamId: string, deviceId: string): GameSt
   if (g.phase === "finished") throw new GameError("WRONG_PHASE");
   const t = findTeam(g, teamId);
   if (t.devices.includes(deviceId)) return g; // idempotent no-op: no version bump
+  assertNotOnOtherTeam(g, deviceId, teamId);
   if (t.devices.length >= MAX_DEVICES) throw new GameError("TOO_MANY_DEVICES");
   return bump(g, { teams: replaceTeam(g, { ...t, devices: [...t.devices, deviceId] }) });
 }

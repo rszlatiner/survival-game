@@ -24,7 +24,7 @@ export type HostAction =
   | { type: "extend"; seconds: number }
   | { type: "setCaptain"; teamId: string; deviceIndex: number }
   | { type: "rename"; teamId: string; name: string }
-  | { type: "remove"; teamId: string }
+  | { type: "remove" | "resetDevices"; teamId: string }
   | { type: "override"; teamId: string; stock?: Partial<Stock>; sp?: number };
 
 export type TeamAction =
@@ -111,7 +111,7 @@ function answer(o: Record<string, unknown>): string {
 export function parseHostAction(x: unknown): HostAction {
   const o = obj(x);
   const type = oneOf(o, "type", [
-    "start", "next", "reveal", "skip", "end", "extend", "setCaptain", "rename", "remove", "override",
+    "start", "next", "reveal", "skip", "end", "extend", "setCaptain", "rename", "remove", "resetDevices", "override",
   ] as const);
   switch (type) {
     case "extend":
@@ -121,6 +121,7 @@ export function parseHostAction(x: unknown): HostAction {
     case "rename":
       return { type, teamId: str(o, "teamId", ID_MAX), name: str(o, "name", NAME_MAX) };
     case "remove":
+    case "resetDevices":
       return { type, teamId: str(o, "teamId", ID_MAX) };
     case "override": {
       const out: HostAction = { type, teamId: str(o, "teamId", ID_MAX) };

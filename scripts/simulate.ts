@@ -240,9 +240,10 @@ export async function simulateGame(opts: SimOptions): Promise<SimResult> {
     }
   };
 
+  // Start opens round 1; every later round (or the tiebreak, or final scoring) comes from Next.
   await host({ type: "start" });
   for (let step = 0; step < MAX_STEPS; step++) {
-    await host({ type: "next" });
+    if (step > 0) await host({ type: "next" });
     let g = await peek();
     if (g.phase === "finished") break;
     await answerAll();
