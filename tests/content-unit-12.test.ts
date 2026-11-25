@@ -19,6 +19,7 @@ describe("unit 12 independent recompute", () => {
     run("u12-simple-prob-01", (p, e) => {
       const [N, r] = numsIn(p);
       expect(near(r / N, Number(e))).toBe(true);
+      expect(p).toContain(r === 1 ? "1 of them is white" : `${r} of them are white`);
     }));
   it("complement-01", () =>
     run("u12-complement-01", (p, e) => {
@@ -54,11 +55,12 @@ describe("unit 12 independent recompute", () => {
     }));
   it("die-01", () =>
     run("u12-die-01", (p, e) => {
-      const m = /number (less|greater) than (\d+)\?/.exec(p)!;
-      const k = Number(m[2]);
+      const m = /fair (\d+)-sided die numbered 1 to \1\. .*number (less|greater) than (\d+)\?/.exec(p)!;
+      const sides = Number(m[1]);
+      const k = Number(m[3]);
       let c = 0;
-      for (let v = 1; v <= 10; v++) if (m[1] === "less" ? v < k : v > k) c++;
-      expect(near(c / 10, Number(e))).toBe(true);
+      for (let v = 1; v <= sides; v++) if (m[2] === "less" ? v < k : v > k) c++;
+      expect(near(c / sides, Number(e))).toBe(true);
     }));
   it("relative-freq-01", () =>
     run("u12-relative-freq-01", (p, e) => {
@@ -134,10 +136,13 @@ describe("unit 12 independent recompute", () => {
     run("u12-claim-03", (p, e, opts, where) => {
       const [a, b, c] = /probabilities (0\.\d+) for red, (0\.\d+) for blue and (0\.\d+) for green/.exec(p)!.slice(1).map(Number);
       const total = (Math.round((a + b + c) * 100) / 100).toFixed(2);
+      expect(a + b + c > 0).toBe(true);
       const verdict = total === "1.00" ? "Possible" : "Not possible";
       const good = opts!.filter((o) => o === `${verdict}, the total is ${total}`);
       expect(good, where).toEqual([e]);
-      expect(new Set(opts!.map((o) => o.split(", ")[0])).size).toBe(2);
+      expect(new Set(opts!.map((o) => o.split(", ")[0])).size, where).toBe(2);
+      // every option is self-consistent: "Possible" only with a total of exactly 1
+      for (const o of opts!) expect(o.startsWith("Possible"), `${where} ${o}`).toBe(o.endsWith("1.00"));
     }));
   it("expected-either-03", () =>
     run("u12-expected-either-03", (p, e) => {
@@ -161,7 +166,7 @@ describe("unit 12 independent recompute", () => {
     }));
   it("combine-bags-03: pooled share over unequal bags", () =>
     run("u12-combine-bags-03", (p, e) => {
-      const m = /holds (\d+) counters and (\d+) are red\. Bag B holds (\d+) counters and (\d+) are red/.exec(p)!;
+      const m = /holds (\d+) counters and (\d+) (?:are|is) red\. Bag B holds (\d+) counters and (\d+) (?:are|is) red/.exec(p)!;
       const [na, ra, nb, rb] = m.slice(1).map(Number);
       expect(near((ra + rb) / (na + nb), Number(e))).toBe(true);
       expect([20, 25, 50]).toContain(na + nb);

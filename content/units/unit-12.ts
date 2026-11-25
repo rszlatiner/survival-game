@@ -45,7 +45,7 @@ export const UNIT_12: QuestionTemplate[] = [
       return { N, r: int(rng, 1, N - 1) };
     },
     prompt: ({ N, r }, zone) =>
-      `${Z[zone].Place}, a bag holds ${N} shells of the same size and ${r} of them are white. You take one without looking. ` +
+      `${Z[zone].Place}, a bag holds ${N} shells of the same size and ${r === 1 ? "1 of them is" : `${r} of them are`} white. You take one without looking. ` +
       `What is the probability that it is white? Give a decimal.`,
     expected: ({ N, r }) => ratio(r, N),
     solution: ({ N, r }) =>
@@ -133,14 +133,17 @@ export const UNIT_12: QuestionTemplate[] = [
     difficulty: 1,
     resource: "water",
     format: DEC,
-    params: (rng) => ({ k: int(rng, 3, 8), less: int(rng, 0, 1) }),
-    prompt: ({ k, less }, zone) =>
-      `${Z[zone].Place}, you roll a fair 10-sided die numbered 1 to 10. What is the probability of a number ${less ? "less" : "greater"} than ${k}? ` +
+    params: (rng) => {
+      const sides = int(rng, 0, 1) ? 20 : 10;
+      return { sides, k: int(rng, 3, sides - 2), less: int(rng, 0, 1) };
+    },
+    prompt: ({ sides, k, less }, zone) =>
+      `${Z[zone].Place}, you roll a fair ${sides}-sided die numbered 1 to ${sides}. What is the probability of a number ${less ? "less" : "greater"} than ${k}? ` +
       `Give a decimal.`,
-    expected: ({ k, less }) => (less ? k - 1 : 10 - k) / 10,
-    solution: ({ k, less }) =>
-      `${less ? `The numbers 1 to ${k - 1}` : `The numbers ${k + 1} to 10`} make ${less ? k - 1 : 10 - k} favourable outcomes out of 10. ` +
-      `${less ? k - 1 : 10 - k} ${DIV} 10 = ${(less ? k - 1 : 10 - k) / 10}.`,
+    expected: ({ sides, k, less }) => (less ? k - 1 : sides - k) / sides,
+    solution: ({ sides, k, less }) =>
+      `${less ? `The numbers 1 to ${k - 1}` : `The numbers ${k + 1} to ${sides}`} make ${less ? k - 1 : sides - k} favourable outcomes out of ${sides}. ` +
+      `${less ? k - 1 : sides - k} ${DIV} ${sides} = ${(less ? k - 1 : sides - k) / sides}.`,
   },
   {
     id: "u12-relative-freq-01",
@@ -237,7 +240,7 @@ export const UNIT_12: QuestionTemplate[] = [
     difficulty: 2,
     resource: "stone",
     format: INT,
-    params: (rng) => ({ s: int(rng, 3, 11) }),
+    params: (rng) => ({ s: int(rng, 2, 12) }),
     prompt: ({ s }, zone) =>
       `${Z[zone].Place}, you roll two fair six-sided dice, one red and one blue. ` +
       `How many of the 36 equally likely outcomes give a total of ${s}?`,
@@ -245,7 +248,7 @@ export const UNIT_12: QuestionTemplate[] = [
     solution: ({ s }) => {
       const found: string[] = [];
       for (let r = 1; r <= 6; r++) if (s - r >= 1 && s - r <= 6) found.push(`(${r}, ${s - r})`);
-      return `Write each pair as (red, blue). The pairs with a total of ${s} are ${found.join(", ")}. That is ${found.length} outcomes.`;
+      return `Write each pair as (red, blue). The pairs with a total of ${s} are ${found.join(", ")}. That is ${found.length} ${found.length === 1 ? "outcome" : "outcomes"}.`;
     },
   },
   {
@@ -349,26 +352,27 @@ export const UNIT_12: QuestionTemplate[] = [
     resource: "water",
     format: CHOICE,
     params: (rng) => {
-      const S = [90, 100, 110, 100, 120, 100][int(rng, 0, 5)];
+      const S = [90, 110, 120, 80, 110, 100][int(rng, 0, 5)];
       for (let i = 0; i < 200; i++) {
         const q1 = 5 * int(rng, 2, 12);
         const q2 = 5 * int(rng, 2, 12);
         const q3 = S - q1 - q2;
-        if (q3 >= 10 && q3 <= 60) return { q1, q2, q3, S, w: int(rng, 0, 1) ? 110 : 90 };
+        if (q3 >= 10 && q3 <= 60) return { q1, q2, q3, S, rot: int(rng, 0, 3) };
       }
-      return { q1: 30, q2: 40, q3: 30, S: 100, w: 90 };
+      return { q1: 30, q2: 40, q3: 30, S: 100, rot: 0 };
     },
     prompt: ({ q1, q2, q3 }, zone) =>
       `${Z[zone].Place}, a friend says a spinner with three colours has probabilities ${dec(q1)} for red, ${dec(q2)} for blue and ${dec(q3)} for green, ` +
       `and no other outcomes. Which statement is correct?`,
-    options: ({ S, w }) => {
-      const W = S === 100 ? w : 100;
-      return [
-        `Possible, the total is ${tot(S)}`,
-        `Not possible, the total is ${tot(S)}`,
-        `Possible, the total is ${tot(W)}`,
-        `Not possible, the total is ${tot(W)}`,
-      ];
+    // Every option is self-consistent: "Possible" goes only with a total of exactly 1.
+    options: ({ S, rot }) => {
+      const near = [S + 10, S - 10, S + 20, S - 20, S + 30].filter((v) => v !== 100 && v > 0);
+      const wrong: number[] = S === 100 ? [] : [100];
+      for (let i = 0; wrong.length < 3; i++) {
+        const v = near[(i + rot) % near.length];
+        if (v !== S && !wrong.includes(v)) wrong.push(v);
+      }
+      return [S, ...wrong].map((T) => `${T === 100 ? "Possible" : "Not possible"}, the total is ${tot(T)}`);
     },
     expected: ({ S }) => `${S === 100 ? "Possible" : "Not possible"}, the total is ${tot(S)}`,
     solution: ({ q1, q2, q3, S }) =>
@@ -415,7 +419,7 @@ export const UNIT_12: QuestionTemplate[] = [
     difficulty: 3,
     resource: "water",
     format: DEC,
-    params: (rng) => ({ k: int(rng, 4, 9) }),
+    params: (rng) => ({ k: int(rng, 3, 9) }),
     prompt: ({ k }, zone) =>
       `${Z[zone].Place}, you spin two fair spinners, each numbered 1 to 5, and add the two results. ` +
       `What is the probability that the total is more than ${k}? Give a decimal.`,
@@ -448,7 +452,7 @@ export const UNIT_12: QuestionTemplate[] = [
       return { T, na, ra: int(rng, 1, na - 1), rb: int(rng, 1, nb - 1) };
     },
     prompt: ({ T, na, ra, rb }, zone) =>
-      `${Z[zone].Place}, bag A holds ${na} counters and ${ra} are red. Bag B holds ${T - na} counters and ${rb} are red. ` +
+      `${Z[zone].Place}, bag A holds ${na} counters and ${ra === 1 ? "1 is" : `${ra} are`} red. Bag B holds ${T - na} counters and ${rb === 1 ? "1 is" : `${rb} are`} red. ` +
       `Both bags are emptied into one box and you pick a counter. What is the probability it is red? Give a decimal.`,
     expected: ({ T, ra, rb }) => ratio(ra + rb, T),
     solution: ({ T, na, ra, rb }) =>
