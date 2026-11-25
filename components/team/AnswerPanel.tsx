@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MAX_ANSWER_LENGTH } from "@/lib/config";
 import type { PublicQuestion } from "@/lib/questions/types";
+import { bigField, btn, card, label } from "@/components/ui/styles";
 
 const ALLOWED: Record<string, RegExp> = {
   integer: /[^0-9\-]/g,
@@ -41,25 +42,25 @@ export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy,
 
   if (!canSubmit && !canSuggest) {
     return (
-      <p className="rounded-xl bg-slate-800 p-3 text-center text-lg text-white">
+      <p className={`${card} text-center text-lg font-bold`}>
         Tiebreak: wait for your captain to submit, or for the timer to run out.
       </p>
     );
   }
 
   if (submitted && canSubmit) {
-    return <p className="rounded-xl bg-emerald-900 p-3 text-center text-lg font-bold text-white">Answer submitted. Wait for the reveal.</p>;
+    return <p className="animate-pop-in rounded-2xl bg-palm-700 p-3 text-center text-lg font-black text-white">Answer submitted. Wait for the reveal.</p>;
   }
 
   return (
     <div className="space-y-3">
       {canSubmit && suggestions.length > 0 && (
-        <div className="rounded-xl bg-slate-800 p-3 text-white">
-          <h3 className="text-sm font-bold">Teammates suggest</h3>
+        <div className={card}>
+          <h3 className="text-sm font-black text-ocean-800">Teammates suggest</h3>
           <ul className="flex flex-wrap gap-2 pt-1">
             {suggestions.map((s, i) => (
               <li key={i}>
-                <button type="button" onClick={() => set(s)} className="min-h-11 rounded-lg bg-slate-600 px-3 text-lg">{s}</button>
+                <button type="button" onClick={() => set(s)} className={btn("sand", "min-h-11 text-lg")}>{s}</button>
               </li>
             ))}
           </ul>
@@ -73,7 +74,7 @@ export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy,
               type="button"
               aria-pressed={value === o}
               onClick={() => set(o)}
-              className={`min-h-14 rounded-xl px-4 text-lg font-semibold ${value === o ? "bg-sky-500 text-black" : "bg-slate-700 text-white"}`}
+              className={`min-h-14 rounded-2xl border-4 px-4 text-lg font-bold ${value === o ? "border-night-900 bg-ocean-600 text-white" : "border-ocean-700 bg-white text-night-900"}`}
             >
               {o}
             </button>
@@ -81,7 +82,7 @@ export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy,
         </div>
       ) : (
         <div className="space-y-2">
-          <label htmlFor="answer" className="block text-sm font-bold text-white">Your answer</label>
+          <label htmlFor="answer" className={label}>Your answer</label>
           <input
             id="answer"
             value={value}
@@ -89,13 +90,13 @@ export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy,
             autoComplete="off"
             maxLength={MAX_ANSWER_LENGTH}
             onChange={(e) => set(e.target.value.replace(ALLOWED[kind] ?? ALLOWED.decimal, ""))}
-            className="min-h-14 w-full rounded-xl border-2 border-slate-400 bg-white px-3 text-2xl text-black"
+            className={bigField}
           />
           <div className="flex gap-2">
             {(SYMBOLS[kind] ?? []).map((s) => (
-              <button key={s} type="button" aria-label={`Insert ${s}`} onClick={() => set(value + s)} className="min-h-12 min-w-12 rounded-lg bg-slate-700 text-xl text-white">{s}</button>
+              <button key={s} type="button" aria-label={`Insert ${s}`} onClick={() => set(value + s)} className={btn("sand", "min-w-12 text-xl")}>{s}</button>
             ))}
-            <button type="button" aria-label="Delete last character" onClick={() => set(value.slice(0, -1))} className="min-h-12 min-w-12 rounded-lg bg-slate-700 text-xl text-white">⌫</button>
+            <button type="button" aria-label="Delete last character" onClick={() => set(value.slice(0, -1))} className={btn("sand", "min-w-12 text-xl")}>⌫</button>
           </div>
         </div>
       )}
@@ -103,11 +104,11 @@ export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy,
         type="button"
         disabled={empty || busy}
         onClick={() => onSend(value.trim())}
-        className="min-h-14 w-full rounded-xl bg-amber-400 text-xl font-bold text-black disabled:opacity-40"
+        className={btn("sunset", "min-h-14 w-full text-xl")}
       >
         {verb}
       </button>
-      {!canSubmit && <p className="text-sm text-slate-200">Only the captain submits. Your suggestion goes to the captain.</p>}
+      {!canSubmit && <p className="text-sm font-semibold">Only the captain submits. Your suggestion goes to the captain.</p>}
     </div>
   );
 }

@@ -12,6 +12,9 @@ import { BuildPanel, FundPanel, MarketPanel } from "./SpendPanel";
 import { StockBar } from "./Stock";
 import { Toast } from "./Toast";
 import { ZONE_STORY, errorText } from "./labels";
+import { CrownIcon, TimerIcon, TrophyIcon, ZONE_COLOR, ZoneScene } from "@/components/art";
+import { IslandBackdrop } from "@/components/ui/Backdrop";
+import { panel } from "@/components/ui/styles";
 
 interface Props {
   state: PublicGameState | null;
@@ -81,32 +84,44 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
 
   const banner =
     status === "offline" ? (
-      <div role="status" className="sticky top-0 z-40 bg-orange-500 p-2 text-center font-bold text-black">
+      <div role="status" className="sticky top-0 z-40 border-b-4 border-night-900 bg-sunset-400 p-2 text-center font-black text-night-900">
         Reconnecting... your screen may be out of date.
       </div>
     ) : null;
 
   const shell = (body: React.ReactNode) => (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="relative isolate min-h-screen text-night-900">
+      <IslandBackdrop />
       {banner}
       <main className="mx-auto max-w-md space-y-4 p-3 pb-24">{body}</main>
       <Toast message={error} onClose={() => setError(null)} />
     </div>
   );
 
-  if (!state) return shell(<p className="p-6 text-center text-lg">Loading the island...</p>);
-  if (!team) return shell(<p className="p-6 text-center text-lg">Your team is not in this game any more. Ask your teacher.</p>);
+  if (!state) return shell(<p className={`${panel} mt-6 text-center text-lg font-bold`}>Loading the island...</p>);
+  if (!team) return shell(<p className={`${panel} mt-6 text-center text-lg font-bold`}>Your team is not in this game any more. Ask your teacher.</p>);
+  const zc = ZONE_COLOR[team.zone];
 
   const header = (
-    <header className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">{team.name}</h1>
-        {isCaptain && <span className="rounded-full bg-amber-400 px-3 py-1 text-sm font-bold text-black">Captain</span>}
+    <header className="space-y-3">
+      <div className={`flag flex items-center justify-between gap-2 rounded-l-3xl border-l-8 border-night-900 py-3 pl-4 pr-10 shadow-[0_6px_0_rgb(11_26_51/0.2)] ${zc.bg} ${zc.text}`}>
+        <h1 className="text-2xl font-black">{team.name}</h1>
+        {isCaptain && (
+          <span className="inline-flex items-center gap-1 rounded-full border-2 border-night-900 bg-sunset-400 px-3 py-1 text-sm font-black text-night-900">
+            <CrownIcon size={18} />
+            Captain
+          </span>
+        )}
       </div>
       {state.phase !== "lobby" && (
-        <section aria-label="Your zone" className="rounded-xl bg-slate-800 p-3">
-          <h2 className="text-lg font-bold">{ZONES[team.zone].name}</h2>
-          <p data-testid="story" className="text-base">{ZONE_STORY[team.zone]}</p>
+        <section aria-label="Your zone" className="overflow-hidden rounded-3xl border-4 border-white bg-sand-50 shadow-[0_6px_0_rgb(11_26_51/0.18)]">
+          <div className="h-24 border-b-4 border-white sm:h-32">
+            <ZoneScene zone={team.zone} />
+          </div>
+          <div className="space-y-1 p-3">
+            <h2 className={`inline-block rounded-full px-3 py-0.5 text-lg font-black ${zc.bg} ${zc.text}`}>{ZONES[team.zone].name}</h2>
+            <p data-testid="story" className="text-base">{ZONE_STORY[team.zone]}</p>
+          </div>
         </section>
       )}
       <StockBar stock={team.stock} />
@@ -117,7 +132,7 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
     return shell(
       <>
         {header}
-        <p className="rounded-xl bg-slate-800 p-4 text-center text-lg">Waiting for your teacher to start the game. {team.deviceCount} device(s) on your team.</p>
+        <p className={`${panel} text-center text-lg font-semibold`}>Waiting for your teacher to start the game. {team.deviceCount} device(s) on your team.</p>
         <Scoreboard teams={state.teams} myId={teamId} winnerId={null} />
       </>,
     );
@@ -130,9 +145,10 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
     return shell(
       <>
         {header}
-        <section aria-label="Game over" className="space-y-2 rounded-xl bg-emerald-900 p-4 text-center">
-          <h2 className="text-2xl font-bold">Game over</h2>
-          <p data-testid="winner" className="text-xl">{winner ? `Winner: ${winner.name}` : "No winner"}</p>
+        <section aria-label="Game over" className="animate-pop-in space-y-2 rounded-3xl border-4 border-sunset-400 bg-night-800 p-4 text-center text-white">
+          <TrophyIcon size={72} className="mx-auto animate-bob" />
+          <h2 className="text-2xl font-black">Game over</h2>
+          <p data-testid="winner" className="text-xl font-bold text-sunset-300">{winner ? `Winner: ${winner.name}` : "No winner"}</p>
           <p data-testid="own-rank" className="text-lg">Your team finished {rank} of {ranked.length}</p>
         </section>
         <Scoreboard teams={state.teams} myId={teamId} winnerId={state.winnerId} />
@@ -149,14 +165,17 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
     return shell(
       <>
         {header}
-        <section aria-label="Problem" className="space-y-3 rounded-xl bg-slate-900 p-3">
-          <div className="flex justify-between text-sm font-bold">
-            <span>{state.phase === "tiebreak" ? "Tiebreak" : `Round ${round?.n ?? ""} of ${state.totalRounds}`}</span>
-            <span aria-label={`${remaining} seconds left`}>{remaining}s</span>
+        <section aria-label="Problem" className={`${panel} space-y-3`}>
+          <div className="flex items-center justify-between gap-2 text-sm font-black">
+            <span className="rounded-full bg-ocean-700 px-3 py-1 text-white">{state.phase === "tiebreak" ? "Tiebreak" : `Round ${round?.n ?? ""} of ${state.totalRounds}`}</span>
+            <span className={`inline-flex items-center gap-1 rounded-full border-2 px-3 py-1 text-lg ${remaining <= 10 ? "border-coral-700 bg-coral-600 text-white" : "border-night-900 bg-white"}`}>
+              <TimerIcon size={22} />
+              <span aria-label={`${remaining} seconds left`}>{remaining}s</span>
+            </span>
           </div>
           {q ? (
             <>
-              <p className="whitespace-pre-wrap text-xl">{q.prompt}</p>
+              <p className="whitespace-pre-wrap rounded-2xl bg-white p-3 text-xl font-semibold">{q.prompt}</p>
               <AnswerPanel
                 question={q}
                 canSubmit={canSubmit}
@@ -167,7 +186,7 @@ export function TeamScreen({ state, status, teamId, deviceIndex, send, fetchSugg
                 busy={busy}
                 onSend={(answer) => void act({ type: canSubmit ? "submit" : "suggest", answer })}
               />
-              {submitted && !canSubmit && <p className="text-sm">Your captain has submitted.</p>}
+              {submitted && !canSubmit && <p className="text-sm font-bold">Your captain has submitted.</p>}
             </>
           ) : (
             <p className="text-lg">Sit tight. Your team has no question in this round.</p>

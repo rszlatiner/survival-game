@@ -55,7 +55,7 @@ export function TeamPlay({ code: rawCode }: { code: string }) {
   );
   const fetchSuggestions = useCallback(() => getSuggestions(code), [code]);
 
-  if (auth.kind === "checking") return <p className="p-6 text-white">Loading...</p>;
+  if (auth.kind === "checking") return <p className="p-6 text-lg font-bold text-white">Loading...</p>;
   if (auth.kind === "none") {
     return (
       <JoinScreen
