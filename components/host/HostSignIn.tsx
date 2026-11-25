@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { hostErrorText } from "./labels";
+import { btn, field } from "@/components/ui/styles";
 
 const PASSWORD_MAX = 200;
 
@@ -40,17 +41,17 @@ export function HostSignIn({
 
   return (
     <form onSubmit={(e) => void submit(e)} className="space-y-2" noValidate>
-      <label htmlFor="host-pw" className="block font-bold">Teacher password</label>
+      <label htmlFor="host-pw" className="block font-black">Teacher password</label>
       <input
         id="host-pw"
         type="password"
         autoComplete="current-password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-lg bg-white p-3 text-black"
+        className={field}
       />
-      {error && <p role="alert" className="rounded-lg bg-red-800 p-2 font-semibold">{error}</p>}
-      <button type="submit" disabled={busy} className="rounded-lg bg-sky-600 px-4 py-3 font-bold disabled:opacity-50">
+      {error && <p role="alert" className="rounded-xl bg-coral-700 p-2 font-semibold text-white">{error}</p>}
+      <button type="submit" disabled={busy} className={btn("ocean")}>
         Sign in
       </button>
     </form>

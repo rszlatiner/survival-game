@@ -11,6 +11,10 @@ import { RESOURCE_LABEL } from "@/components/team/labels";
 import { HostSignIn } from "./HostSignIn";
 import { hostErrorText, isAuthLost } from "./labels";
 import { useCountdown } from "./useCountdown";
+import { CrownIcon, HazardIcon, RaftIcon, StarIcon, Sun, TimerIcon, TrophyIcon, ZONE_COLOR } from "@/components/art";
+import { IslandBackdrop } from "@/components/ui/Backdrop";
+import { Wordmark } from "@/components/ui/Wordmark";
+import { btn as tone, card, field, panel } from "@/components/ui/styles";
 
 interface Props {
   state: PublicGameState | null;
@@ -19,7 +23,6 @@ interface Props {
   login: (code: string, password: string) => Promise<unknown>;
 }
 
-const btn = "min-h-11 rounded-lg px-4 py-2 font-bold disabled:opacity-40";
 
 function parseCount(raw: string): number | null {
   if (!/^\d+$/.test(raw.trim())) return null;
@@ -52,20 +55,21 @@ export function HostScreen({ state, status, send, login }: Props) {
 
   const banner =
     status === "offline" ? (
-      <div role="status" className="sticky top-0 z-40 bg-orange-500 p-2 text-center font-bold text-black">
+      <div role="status" className="sticky top-0 z-40 border-b-4 border-night-900 bg-sunset-400 p-2 text-center font-black text-night-900">
         Reconnecting... the screen may be out of date.
       </div>
     ) : null;
 
   const shell = (body: React.ReactNode) => (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="relative isolate min-h-screen text-night-900">
+      <IslandBackdrop />
       {banner}
       <main className="mx-auto max-w-4xl space-y-4 p-4 pb-24">{body}</main>
       <Toast message={error} onClose={() => setError(null)} />
     </div>
   );
 
-  if (!state) return shell(<p className="p-6 text-center text-lg">Loading the game...</p>);
+  if (!state) return shell(<p className={`${panel} text-center text-lg font-bold`}>Loading the game...</p>);
 
   const { phase, round } = state;
   const tied = state.tiedIds.length > 0;
@@ -80,7 +84,7 @@ export function HostScreen({ state, status, send, login }: Props) {
   const revealLabel = phase === "tiebreak" ? "Reveal tiebreak result" : "Reveal answers";
 
   const authPrompt = authLost ? (
-    <section role="alert" className="space-y-2 rounded-xl bg-red-900 p-4">
+    <section role="alert" className="space-y-2 rounded-3xl border-4 border-coral-600 bg-sand-50 p-4">
       <p className="font-bold">Your host session has expired. Sign in again with the teacher password.</p>
       <HostSignIn code={state.code} login={login} onSignedIn={() => setAuthLost(false)} />
     </section>
@@ -89,44 +93,54 @@ export function HostScreen({ state, status, send, login }: Props) {
   return shell(
     <>
       {authPrompt}
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Host screen</h1>
-          <p>
-            Join code <span data-testid="join-code" className="font-mono text-3xl font-extrabold tracking-widest text-amber-300">{state.code}</span>
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border-4 border-sunset-400 bg-night-800/95 p-4 text-white">
+        <div className="space-y-2">
+          <Wordmark as="p" />
+          <h1 className="text-2xl font-black">Host screen</h1>
+          <p className="flex flex-wrap items-center gap-2">
+            Join code <span data-testid="join-code" className="wood-sign rounded-xl px-3 py-1 font-mono text-3xl font-black tracking-widest text-sunset-300">{state.code}</span>
           </p>
         </div>
-        <div className="text-right">
-          <p data-testid="phase" className="text-lg font-bold capitalize">{phase}{round && phase !== "lobby" ? `, round ${round.n} of ${state.totalRounds}` : ""}</p>
-          {live && <p aria-label={`${remaining} seconds left`} className="font-mono text-3xl">{remaining}s</p>}
-          <a href={`/projector/${state.code}`} target="_blank" rel="noreferrer" className="text-sky-300 underline">
+        <div className="space-y-1 text-right">
+          <p data-testid="phase" className="text-lg font-black capitalize">{phase}{round && phase !== "lobby" ? `, round ${round.n} of ${state.totalRounds}` : ""}</p>
+          {live && (
+            <p className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 font-mono text-3xl font-black text-night-900">
+              <TimerIcon size={30} />
+              <span aria-label={`${remaining} seconds left`}>{remaining}s</span>
+            </p>
+          )}
+          <a href={`/projector/${state.code}`} target="_blank" rel="noreferrer" className="block font-bold text-sunset-300 underline">
             Open projector view
           </a>
         </div>
       </header>
 
       {phase === "finished" ? (
-        <section className="rounded-xl bg-emerald-900 p-4 text-xl font-bold">
+        <section className="flex items-center gap-3 rounded-3xl border-4 border-sunset-400 bg-palm-700 p-4 text-xl font-black text-white">
+          <TrophyIcon size={48} />
           Game over: {state.teams.find((t) => t.id === state.winnerId)?.name ?? "no winner"}
         </section>
       ) : (
-        <section aria-label="Game controls" className="space-y-3 rounded-xl bg-slate-900 p-3">
+        <section aria-label="Game controls" className={`${panel} space-y-3`}>
           <div className="flex flex-wrap gap-2">
             {phase === "lobby" && (
-              <button type="button" disabled={busy || state.teams.length === 0} onClick={() => void act({ type: "start" })} className={`${btn} bg-emerald-600`}>
+              <button type="button" disabled={busy || state.teams.length === 0} onClick={() => void act({ type: "start" })} className={tone("palm")}>
+                <StarIcon size={24} />
                 Start game
               </button>
             )}
             {phase === "lobby" && state.teams.length === 0 && (
-              <p data-testid="start-hint" className="self-center text-sm text-amber-300">Start unlocks when at least one team has joined.</p>
+              <p data-testid="start-hint" className="self-center text-sm font-bold text-coral-700">Start unlocks when at least one team has joined.</p>
             )}
-            <button type="button" disabled={!canNext} onClick={() => void act({ type: "next" })} className={`${btn} bg-sky-600`}>
+            <button type="button" disabled={!canNext} onClick={() => void act({ type: "next" })} className={tone("ocean")}>
+              <RaftIcon size={26} />
               {nextLabel}
             </button>
-            <button type="button" disabled={!canReveal} onClick={() => void act({ type: "reveal" })} className={`${btn} bg-amber-500 text-black`}>
+            <button type="button" disabled={!canReveal} onClick={() => void act({ type: "reveal" })} className={tone("sunset")}>
+              <Sun size={26} />
               {revealLabel}
             </button>
-            <button type="button" disabled={!live || busy} onClick={() => void act({ type: "skip" })} className={`${btn} bg-slate-600`}>
+            <button type="button" disabled={!live || busy} onClick={() => void act({ type: "skip" })} className={tone("sand")}>
               Skip question
             </button>
           </div>
@@ -145,21 +159,24 @@ export function HostScreen({ state, status, send, login }: Props) {
               }}
             >
               <label className="block">
-                <span className="block text-sm font-bold">Extra seconds</span>
-                <input value={extendBy} onChange={(e) => setExtendBy(e.target.value)} inputMode="numeric" className="w-24 rounded-lg bg-white p-2 text-black" />
+                <span className="block text-sm font-black">Extra seconds</span>
+                <input value={extendBy} onChange={(e) => setExtendBy(e.target.value)} inputMode="numeric" className={`${field} w-24`} />
               </label>
-              <button type="submit" disabled={busy} className={`${btn} bg-slate-600`}>Extend timer</button>
+              <button type="submit" disabled={busy} className={tone("night")}>
+                <TimerIcon size={22} />
+                Extend timer
+              </button>
             </form>
           )}
 
           {phase === "tiebreak" && (
-            <p className="rounded-lg bg-amber-900 p-2 text-sm">
+            <p className="rounded-xl bg-sunset-200 p-2 text-sm font-semibold">
               Tiebreak in progress. Press Reveal to decide it. Ending the game decides it too.
             </p>
           )}
 
           {confirmEnd ? (
-            <div role="group" aria-label="Confirm end game" className="space-y-2 rounded-lg bg-red-950 p-3">
+            <div role="group" aria-label="Confirm end game" className="space-y-2 rounded-2xl border-4 border-coral-600 bg-white p-3">
               <p className="font-bold">
                 {phase === "tiebreak"
                   ? "End the game now? This decides the tiebreak with the answers so far."
@@ -172,17 +189,18 @@ export function HostScreen({ state, status, send, login }: Props) {
                   type="button"
                   disabled={busy}
                   onClick={() => void act({ type: "end" }).then(() => setConfirmEnd(false))}
-                  className={`${btn} bg-red-600`}
+                  className={tone("danger")}
                 >
                   Yes, end the game
                 </button>
-                <button type="button" onClick={() => setConfirmEnd(false)} className={`${btn} bg-slate-600`}>
+                <button type="button" onClick={() => setConfirmEnd(false)} className={tone("sand")}>
                   Keep playing
                 </button>
               </div>
             </div>
           ) : (
-            <button type="button" disabled={busy} onClick={() => setConfirmEnd(true)} className={`${btn} bg-red-700`}>
+            <button type="button" disabled={busy} onClick={() => setConfirmEnd(true)} className={tone("danger")}>
+              <HazardIcon size={22} />
               End game
             </button>
           )}
@@ -203,9 +221,9 @@ function QuestionPreview({ state }: { state: PublicGameState }) {
   const first = state.teams.map((t) => round.questions[t.id]).find(Boolean);
   const submitted = state.teams.filter((t) => round.submissions[t.id]?.submitted).length;
   return (
-    <section aria-label="Current question" className="space-y-2 rounded-xl bg-slate-900 p-3">
-      <h2 className="font-bold">Current question (numbers differ by team)</h2>
-      <p className="whitespace-pre-wrap">{first?.prompt ?? "No question this round."}</p>
+    <section aria-label="Current question" className={`${panel} space-y-2`}>
+      <h2 className="font-black">Current question (numbers differ by team)</h2>
+      <p className={`${card} whitespace-pre-wrap text-lg`}>{first?.prompt ?? "No question this round."}</p>
       <p className="text-sm">{submitted} of {Object.keys(round.submissions).length} teams have submitted.</p>
     </section>
   );
@@ -214,11 +232,12 @@ function QuestionPreview({ state }: { state: PublicGameState }) {
 function RevealSummary({ state }: { state: PublicGameState }) {
   const results = state.round!.results!;
   return (
-    <section aria-label="Round results" className="space-y-1 rounded-xl bg-slate-900 p-3">
-      <h2 className="font-bold">Round results</h2>
-      <ul>
+    <section aria-label="Round results" className={`${panel} space-y-1`}>
+      <h2 className="font-black">Round results</h2>
+      <ul className="space-y-1">
         {state.teams.filter((t) => results[t.id]).map((t) => (
-          <li key={t.id}>
+          <li key={t.id} className={`flex items-center gap-2 rounded-xl px-2 py-1 ${results[t.id].correct ? "bg-palm-200" : "bg-coral-200"}`}>
+            {results[t.id].correct ? <StarIcon size={20} /> : <span aria-hidden="true" className="w-5" />}
             {t.name}: {results[t.id].correct ? "correct" : "not correct"} (answer {results[t.id].expected})
           </li>
         ))}
@@ -229,8 +248,8 @@ function RevealSummary({ state }: { state: PublicGameState }) {
 
 function TeamList({ state, act }: { state: PublicGameState; act: (a: HostAction) => Promise<boolean> }) {
   return (
-    <section aria-label="Teams" className="space-y-2">
-      <h2 className="text-xl font-bold">Teams ({state.teams.length})</h2>
+    <section aria-label="Teams" className={`${panel} space-y-2`}>
+      <h2 className="text-xl font-black">Teams ({state.teams.length})</h2>
       {state.teams.length === 0 && <p>No teams yet. Students join with the code.</p>}
       <ul className="space-y-2">
         {state.teams.map((t) => (
@@ -246,26 +265,26 @@ function TeamRow({ team, lobby, finished, act }: { team: PublicTeam; lobby: bool
   const [cap, setCap] = useState(String(team.captainIndex));
   const [confirmRemove, setConfirmRemove] = useState(false);
   return (
-    <li className="space-y-2 rounded-xl bg-slate-900 p-3">
+    <li className={`${card} space-y-2 border-l-8`} style={{ borderLeftColor: ZONE_COLOR[team.zone].hex }}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-lg font-bold">{team.name}</span>
-        <span className="text-sm">{ZONES[team.zone].name} - {team.deviceCount} device(s) - {team.sp} SP</span>
+        <span className="text-lg font-black">{team.name}</span>
+        <span className={`rounded-full px-2 py-0.5 text-sm font-bold ${ZONE_COLOR[team.zone].bg} ${ZONE_COLOR[team.zone].text}`}>{ZONES[team.zone].name} - {team.deviceCount} device(s) - {team.sp} SP</span>
       </div>
       {lobby && (
         <div className="flex flex-wrap items-end gap-2">
-          <input aria-label={`New name for ${team.name}`} value={name} onChange={(e) => setName(e.target.value)} className="rounded-lg bg-white p-2 text-black" />
-          <button type="button" disabled={name.trim() === "" || name === team.name} onClick={() => void act({ type: "rename", teamId: team.id, name: name.trim() })} className={`${btn} bg-slate-600`}>
+          <input aria-label={`New name for ${team.name}`} value={name} onChange={(e) => setName(e.target.value)} className={`${field} w-auto`} />
+          <button type="button" disabled={name.trim() === "" || name === team.name} onClick={() => void act({ type: "rename", teamId: team.id, name: name.trim() })} className={tone("sand")}>
             Rename
           </button>
           {confirmRemove ? (
             <>
-              <button type="button" onClick={() => void act({ type: "remove", teamId: team.id })} className={`${btn} bg-red-600`}>
+              <button type="button" onClick={() => void act({ type: "remove", teamId: team.id })} className={tone("danger")}>
                 Yes, remove {team.name}
               </button>
-              <button type="button" onClick={() => setConfirmRemove(false)} className={`${btn} bg-slate-600`}>Cancel</button>
+              <button type="button" onClick={() => setConfirmRemove(false)} className={tone("sand")}>Cancel</button>
             </>
           ) : (
-            <button type="button" onClick={() => setConfirmRemove(true)} className={`${btn} bg-red-700`}>
+            <button type="button" onClick={() => setConfirmRemove(true)} className={tone("coral")}>
               Remove {team.name}
             </button>
           )}
@@ -274,14 +293,14 @@ function TeamRow({ team, lobby, finished, act }: { team: PublicTeam; lobby: bool
       {!finished && team.deviceCount > 0 && (
         <div className="flex items-end gap-2">
           <label className="text-sm">
-            <span className="block font-bold">Captain device</span>
-            <select aria-label={`Captain device for ${team.name}`} value={cap} onChange={(e) => setCap(e.target.value)} className="rounded-lg bg-white p-2 text-black">
+            <span className="flex items-center gap-1 font-black"><CrownIcon size={18} />Captain device</span>
+            <select aria-label={`Captain device for ${team.name}`} value={cap} onChange={(e) => setCap(e.target.value)} className={`${field} w-auto`}>
               {Array.from({ length: team.deviceCount }, (_, i) => (
                 <option key={i} value={i}>Device {i + 1}{i === team.captainIndex ? " (captain)" : ""}</option>
               ))}
             </select>
           </label>
-          <button type="button" disabled={Number(cap) === team.captainIndex} onClick={() => void act({ type: "setCaptain", teamId: team.id, deviceIndex: Number(cap) })} className={`${btn} bg-slate-600`}>
+          <button type="button" disabled={Number(cap) === team.captainIndex} onClick={() => void act({ type: "setCaptain", teamId: team.id, deviceIndex: Number(cap) })} className={tone("sand")}>
             Set captain for {team.name}
           </button>
         </div>
@@ -327,31 +346,31 @@ function OverrideForm({ teams, act }: { teams: PublicTeam[]; act: (a: HostAction
   };
 
   return (
-    <form aria-label="Manual override" onSubmit={submit} noValidate className="space-y-2 rounded-xl bg-slate-900 p-3">
-      <h2 className="font-bold">Manual override</h2>
+    <form aria-label="Manual override" onSubmit={submit} noValidate className={`${panel} space-y-2`}>
+      <h2 className="font-black">Manual override</h2>
       <p className="text-sm">Set a team's resources or points by hand. Leave a box empty to keep its value.</p>
       <label className="block">
-        <span className="block text-sm font-bold">Team</span>
-        <select aria-label="Override team" value={selected} onChange={(e) => setTeamId(e.target.value)} className="rounded-lg bg-white p-2 text-black">
+        <span className="block text-sm font-black">Team</span>
+        <select aria-label="Override team" value={selected} onChange={(e) => setTeamId(e.target.value)} className={`${field} w-auto`}>
           {teams.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
         </select>
       </label>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {fields.map((f) => (
           <label key={f.key} className="block text-sm">
-            <span className="block font-bold">{f.label}</span>
+            <span className="block font-black">{f.label}</span>
             <input
               aria-label={`Override ${f.label}`}
               inputMode="numeric"
               value={vals[f.key] ?? ""}
               onChange={(e) => setVals((v) => ({ ...v, [f.key]: e.target.value }))}
-              className="w-full rounded-lg bg-white p-2 text-black"
+              className={field}
             />
           </label>
         ))}
       </div>
-      {err && <p role="alert" className="rounded-lg bg-red-800 p-2 font-semibold">{err}</p>}
-      <button type="submit" className={`${btn} bg-amber-500 text-black`}>Apply override</button>
+      {err && <p role="alert" className="rounded-xl bg-coral-700 p-2 font-semibold text-white">{err}</p>}
+      <button type="submit" className={tone("sunset")}>Apply override</button>
     </form>
   );
 }

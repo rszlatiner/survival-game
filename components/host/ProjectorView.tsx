@@ -5,7 +5,24 @@ import type { GameStatus } from "@/lib/client/useGameState";
 import { HAZARD_THRESHOLD_PER_TEAM, ZONES } from "@/lib/config";
 import { RESOURCES, type ZoneId } from "@/lib/questions/types";
 import { Scoreboard } from "@/components/team/Scoreboard";
-import { RESOURCE_ICON, RESOURCE_LABEL } from "@/components/team/labels";
+import { RESOURCE_LABEL } from "@/components/team/labels";
+import {
+  IslandMap,
+  Palm,
+  RaftIcon,
+  RaiderIcon,
+  ResourceIcon,
+  StarIcon,
+  StormIcon,
+  TimerIcon,
+  TrophyIcon,
+  ZONE_ANCHOR,
+  ZONE_COLOR,
+} from "@/components/art";
+import { NightBackdrop } from "@/components/ui/Backdrop";
+import { Confetti } from "@/components/ui/Confetti";
+import { Wordmark } from "@/components/ui/Wordmark";
+import { nightPanel } from "@/components/ui/styles";
 import { useCountdown } from "./useCountdown";
 
 const ZONE_ORDER = Object.keys(ZONES) as ZoneId[];
@@ -18,16 +35,17 @@ export function ProjectorView({ state, status }: { state: PublicGameState | null
   const remaining = useCountdown(state);
   const banner =
     status === "offline" ? (
-      <div role="status" className="bg-orange-400 p-3 text-center text-2xl font-bold text-black">
+      <div role="status" className="relative z-10 rounded-2xl bg-sunset-400 p-3 text-center text-3xl font-black text-night-900">
         Reconnecting... the display may be out of date.
       </div>
     ) : null;
 
   if (!state) {
     return (
-      <div className="min-h-screen bg-black text-white">
+      <div className="relative isolate min-h-screen text-white">
+        <NightBackdrop />
         {banner}
-        <p className="p-16 text-center text-5xl">Loading the island...</p>
+        <p className="p-16 text-center text-5xl font-black">Loading the island...</p>
       </div>
     );
   }
@@ -45,23 +63,30 @@ export function ProjectorView({ state, status }: { state: PublicGameState | null
 
   if (phase === "lobby") {
     return (
-      <div className="min-h-screen bg-black p-8 text-white">
+      <div className="relative isolate min-h-screen p-8 text-white">
+        <NightBackdrop />
         {banner}
         <main className="mx-auto max-w-6xl space-y-8 text-center">
-          <h1 className="text-5xl font-bold">Desert Island Maths</h1>
-          <p className="text-3xl">Join at this address with the code</p>
-          <p aria-label="Join code" data-testid="join-code" className="font-mono text-9xl font-extrabold tracking-widest text-amber-300">
-            {state.code}
-          </p>
-          <section aria-label="Teams so far">
-            <h2 className="mb-4 text-3xl font-bold">Teams ({state.teams.length})</h2>
+          <div className="flex justify-center">
+            <h1 className="sr-only">Desert Island Maths</h1>
+            <Wordmark as="p" size="xl" />
+          </div>
+          <div className="mx-auto max-w-4xl space-y-4">
+            <p className="text-4xl font-bold">Join at this address with the code</p>
+            <p aria-label="Join code" data-testid="join-code" className="wood-sign rounded-3xl px-8 py-6 font-mono text-9xl font-black tracking-[0.2em] text-sunset-300">
+              {state.code}
+            </p>
+          </div>
+          <section aria-label="Teams so far" className={nightPanel}>
+            <h2 className="mb-4 text-4xl font-black">Teams ({state.teams.length})</h2>
             {state.teams.length === 0 ? (
               <p className="text-3xl">Waiting for the first team...</p>
             ) : (
-              <ul className="flex flex-wrap justify-center gap-4">
+              <ul className="flex flex-wrap justify-center gap-5">
                 {state.teams.map((t) => (
-                  <li key={t.id} className="rounded-2xl bg-sky-800 px-8 py-4 text-4xl font-bold">
-                    {t.name}
+                  <li key={t.id} className="animate-pop-in flex items-stretch">
+                    <span aria-hidden="true" className="w-2 rounded-full bg-sand-300" />
+                    <span className={`flag py-4 pl-6 pr-14 text-4xl font-black ${ZONE_COLOR[t.zone].bg} ${ZONE_COLOR[t.zone].text}`}>{t.name}</span>
                   </li>
                 ))}
               </ul>
@@ -72,12 +97,16 @@ export function ProjectorView({ state, status }: { state: PublicGameState | null
     );
   }
 
+  const tile = "rounded-2xl px-5 py-2 font-black inline-flex items-center gap-3";
+
   return (
-    <div className="min-h-screen bg-black p-6 text-white">
+    <div className="relative isolate min-h-screen p-6 text-white">
+      <NightBackdrop />
+      {phase === "finished" && <Confetti />}
       {banner}
-      <main className="mx-auto max-w-[1800px] space-y-6">
-        <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-900 p-4">
-          <h1 className="text-4xl font-bold">
+      <main className="relative mx-auto max-w-[1800px] space-y-6">
+        <header className={`${nightPanel} flex flex-wrap items-center justify-between gap-4 py-3`}>
+          <h1 className="text-5xl font-black">
             {phase === "finished"
               ? "Game over"
               : phase === "tiebreak"
@@ -85,43 +114,66 @@ export function ProjectorView({ state, status }: { state: PublicGameState | null
                 : `Round ${round?.n ?? state.roundsPlayed} of ${state.totalRounds}`}
           </h1>
           {live && (
-            <p aria-label={`${remaining} seconds left`} data-testid="timer" className="font-mono text-7xl font-extrabold text-amber-300">
-              {remaining}s
-            </p>
+            <div className={`flex items-center gap-3 rounded-3xl border-4 px-5 py-1 ${remaining <= 10 ? "border-white bg-coral-600" : "border-sunset-400 bg-night-900"}`}>
+              <TimerIcon size={64} />
+              <p aria-label={`${remaining} seconds left`} data-testid="timer" className={`font-mono text-7xl font-black ${remaining <= 10 ? "text-white" : "text-sunset-300"}`}>
+                {remaining}s
+              </p>
+            </div>
           )}
-          <p className="text-3xl">Code: <span className="font-mono font-bold">{state.code}</span></p>
+          <p className="text-4xl font-bold">Code: <span className="font-mono font-black tracking-widest text-sunset-300">{state.code}</span></p>
         </header>
 
         {phase === "finished" && (
-          <section aria-label="Winner" className="dim-reveal-pop rounded-2xl bg-emerald-800 p-8 text-center">
-            <p data-testid="winner" className="text-7xl font-extrabold">{winner ? `Winner: ${winner.name}` : "No winner"}</p>
+          <section aria-label="Winner" className="dim-reveal-pop relative flex flex-wrap items-center justify-center gap-6 rounded-3xl border-8 border-sunset-400 bg-palm-700 p-8 text-center">
+            <TrophyIcon size={140} className="animate-bob" />
+            <p data-testid="winner" className="text-7xl font-black">{winner ? `Winner: ${winner.name}` : "No winner"}</p>
+            <TrophyIcon size={140} className="animate-bob" />
           </section>
         )}
 
         {round && phase !== "finished" && (
-          <section aria-label="Island event" className="flex flex-wrap items-center gap-6 rounded-2xl bg-slate-900 p-4 text-3xl">
-            <span data-testid="roll" className="rounded-xl bg-white px-6 py-2 text-5xl font-extrabold text-black">Roll {round.roll}</span>
+          <section aria-label="Island event" className={`${nightPanel} flex flex-wrap items-center gap-5 py-3 text-3xl`}>
+            <span data-testid="roll" className="rounded-2xl border-4 border-night-900 bg-white px-6 py-2 text-5xl font-black text-night-900 shadow-[0_6px_0_#07111f]">Roll {round.roll}</span>
             {round.bonusResource && (
-              <span className="rounded-xl bg-emerald-700 px-4 py-2 font-bold">
-                Bonus: {RESOURCE_ICON[round.bonusResource]} {RESOURCE_LABEL[round.bonusResource]}
+              <span className={`${tile} bg-palm-700`}>
+                <ResourceIcon resource={round.bonusResource} size={44} />
+                Bonus: {RESOURCE_LABEL[round.bonusResource]}
               </span>
             )}
-            {round.raider && <span className="rounded-xl bg-red-700 px-4 py-2 font-bold">Raiders on the island!</span>}
-            {round.hazard && <span className="rounded-xl bg-orange-600 px-4 py-2 font-bold">Hazard this round!</span>}
-            {live && <span>{answered} of {asked} teams have answered</span>}
+            {round.raider && (
+              <span className={`${tile} bg-coral-700`}>
+                <RaiderIcon size={48} />
+                Raiders on the island!
+              </span>
+            )}
+            {round.hazard && (
+              <span className={`${tile} bg-sunset-400 text-night-900`}>
+                <StormIcon size={48} />
+                Hazard this round!
+              </span>
+            )}
+            {live && <span className="font-bold">{answered} of {asked} teams have answered</span>}
           </section>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section aria-label="Island map" className="grid grid-cols-2 gap-3 rounded-2xl bg-sky-950 p-4 md:grid-cols-3">
+        <div className="grid gap-6 xl:grid-cols-[3fr_2fr]">
+          <section aria-label="Island map" className="relative aspect-[400/260] w-full overflow-hidden rounded-3xl border-8 border-sand-300">
+            <IslandMap className="absolute inset-0" />
             {ZONE_ORDER.map((z) => {
               const here = state.teams.filter((t) => t.zone === z);
+              const c = ZONE_COLOR[z];
               return (
-                <div key={z} data-testid={`zone-${z}`} className="min-h-32 rounded-xl border-4 border-amber-200 bg-emerald-900 p-3">
-                  <h2 className="text-3xl font-bold">{ZONES[z].name}</h2>
-                  <ul className="text-2xl">
+                <div
+                  key={z}
+                  data-testid={`zone-${z}`}
+                  style={ZONE_ANCHOR[z]}
+                  className={`absolute max-w-[40%] -translate-x-1/2 -translate-y-1/2 rounded-2xl border-4 border-white px-4 py-2 text-center shadow-[0_6px_0_rgb(7_17_31/0.5)] ${c.bg} ${c.text}`}
+                >
+                  <h2 className="text-3xl font-black uppercase tracking-wide">{ZONES[z].name}</h2>
+                  <ul className="text-2xl font-bold leading-tight">
                     {here.map((t) => (
-                      <li key={t.id}>{t.name}</li>
+                      <li key={t.id} className="truncate">{t.name}</li>
                     ))}
                   </ul>
                 </div>
@@ -130,43 +182,58 @@ export function ProjectorView({ state, status }: { state: PublicGameState | null
           </section>
 
           <div className="space-y-6">
-            <div className="text-3xl"><Scoreboard teams={state.teams} myId="" winnerId={state.winnerId} /></div>
-            <section aria-label="Raft progress" className="rounded-2xl bg-slate-900 p-4 text-3xl">
-              <h2 className="mb-2 text-3xl font-bold">Rafts</h2>
-              <ul className="space-y-1">
-                {state.teams.map((t) => (
-                  <li key={t.id} className="flex justify-between">
-                    <span>{t.name}</span>
-                    <span>Raft {raftStage(t)} of 3</span>
-                  </li>
-                ))}
+            <div className="text-3xl"><Scoreboard teams={state.teams} myId="" winnerId={state.winnerId} variant="projector" /></div>
+            <section aria-label="Raft progress" className={`${nightPanel} text-3xl`}>
+              <h2 className="mb-3 text-3xl font-black">Rafts</h2>
+              <ul className="space-y-3">
+                {state.teams.map((t) => {
+                  const stage = raftStage(t);
+                  return (
+                    <li key={t.id} className="space-y-1">
+                      <div className="flex justify-between gap-3 font-bold">
+                        <span className="truncate">{t.name}</span>
+                        <span className="shrink-0">Raft {stage} of 3</span>
+                      </div>
+                      <div aria-hidden="true" className="relative h-14 overflow-hidden rounded-full border-4 border-ocean-300 bg-ocean-700">
+                        <div className="absolute inset-y-0 left-0 bg-ocean-500" style={{ width: `${(stage / 3) * 100}%` }} />
+                        <Palm size={48} className="absolute right-1 top-0" />
+                        <span className="absolute top-0 transition-[left] duration-700" style={{ left: `calc(${stage / 3} * (100% - 104px) + 4px)` }}>
+                          {stage === 0 ? <RaftIcon stage={1} size={48} className="opacity-50" /> : <RaftIcon stage={stage as 1 | 2 | 3} size={48} className="animate-bob" />}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
-            <section aria-label="Hazard fund" className="rounded-2xl bg-slate-900 p-4 text-3xl">
-              <h2 className="mb-2 font-bold">Island fund</h2>
+            <section aria-label="Hazard fund" className={`${nightPanel} text-3xl`}>
+              <h2 className="mb-2 flex items-center gap-3 font-black">
+                <StormIcon size={56} className={round?.hazard && phase !== "finished" ? "animate-bob" : ""} />
+                Island fund
+              </h2>
               <div
                 role="progressbar"
                 aria-valuemin={0}
                 aria-valuemax={threshold}
                 aria-valuenow={Math.min(fundTotal, threshold)}
                 aria-label="Island fund progress"
-                className="h-8 w-full overflow-hidden rounded-full bg-slate-700"
+                className="h-10 w-full overflow-hidden rounded-full border-4 border-sand-300 bg-night-900"
               >
-                <div className="h-full bg-amber-400" style={{ width: `${fundPct}%` }} />
+                <div className="h-full rounded-full bg-gradient-to-r from-sunset-400 to-palm-300 transition-[width] duration-700" style={{ width: `${fundPct}%` }} />
               </div>
-              <p className="mt-1">{fundTotal} of {threshold} needed</p>
+              <p className="mt-2 font-bold">{fundTotal} of {threshold} needed</p>
             </section>
           </div>
         </div>
 
         <section aria-label="Team stock" className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {state.teams.map((t) => (
-            <div key={t.id} className="rounded-2xl bg-slate-900 p-4 text-3xl">
-              <h3 className="font-bold">{t.name}</h3>
-              <p>
+            <div key={t.id} className={`${nightPanel} border-l-[16px] p-4 text-3xl`} style={{ borderLeftColor: ZONE_COLOR[t.zone].hex }}>
+              <h3 className="truncate font-black">{t.name}</h3>
+              <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                 {RESOURCES.map((r) => (
-                  <span key={r} className="mr-3" aria-label={`${RESOURCE_LABEL[r]} ${t.stock[r]}`}>
-                    <span aria-hidden="true">{RESOURCE_ICON[r]}</span> {t.stock[r]}
+                  <span key={r} className="inline-flex items-center gap-1 font-bold" aria-label={`${RESOURCE_LABEL[r]} ${t.stock[r]}`}>
+                    <ResourceIcon resource={r} size={36} /> {t.stock[r]}
                   </span>
                 ))}
               </p>
@@ -175,17 +242,20 @@ export function ProjectorView({ state, status }: { state: PublicGameState | null
         </section>
 
         {results && (
-          <section aria-label="Reveal" className="dim-reveal-pop space-y-3 rounded-2xl bg-slate-900 p-6">
-            <h2 className="text-4xl font-bold">Answers</h2>
+          <section aria-label="Reveal" className={`${nightPanel} dim-reveal-pop space-y-3 p-6`}>
+            <h2 className="text-4xl font-black">Answers</h2>
             <ul className="grid gap-3 md:grid-cols-2">
               {state.teams
                 .filter((t) => results[t.id])
                 .map((t) => {
                   const r = results[t.id];
                   return (
-                    <li key={t.id} className={`rounded-xl p-4 text-3xl ${r.correct ? "bg-emerald-700" : "bg-orange-700"}`}>
-                      <strong>{t.name}</strong>: {r.correct ? "Correct" : "Not quite"}
-                      <div>Answer: <strong>{r.expected}</strong></div>
+                    <li key={t.id} className={`flex items-center gap-4 rounded-2xl p-4 text-3xl ${r.correct ? "celebrate bg-palm-700" : "gentle-wobble bg-coral-600"}`}>
+                      {r.correct ? <StarIcon size={56} /> : <span aria-hidden="true" className="w-14 shrink-0" />}
+                      <div>
+                        <strong>{t.name}</strong>: {r.correct ? "Correct" : "Not quite"}
+                        <div>Answer: <strong>{r.expected}</strong></div>
+                      </div>
                     </li>
                   );
                 })}
