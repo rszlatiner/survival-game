@@ -35,3 +35,46 @@ export function rankChecks(bank: QuestionTemplate[], allow: string[] = []) {
     }
   });
 }
+
+/** Numeric value of a fraction-style option ("3/4", "2 1/3", "5", "0.25"), or null if it is not one. */
+export function optionValue(o: string): number | null {
+  let m = /^(?:(\d+) )?(\d+)\/(\d+)$/.exec(o);
+  if (m) return (m[1] ? Number(m[1]) : 0) + Number(m[2]) / Number(m[3]);
+  m = /^\d+(?:\.\d+)?$/.exec(o);
+  return m ? Number(o) : null;
+}
+
+/**
+ * For choice templates whose options are all numbers or fractions: no other option has the key's value, the key's
+ * rank by VALUE is not the same on most seeds, and the key is sometimes the smallest and sometimes the largest.
+ */
+export function valueRankChecks(bank: QuestionTemplate[], allow: string[] = []) {
+  describe("key rank by value varies (fraction and number options)", () => {
+    for (const t of bank.filter((x) => x.format.kind === "choice" && !allow.includes(x.id))) {
+      it(`${t.id}`, () => {
+        const counts = [0, 0, 0, 0];
+        let n = 0;
+        let applicable = true;
+        eachQuestion(t, ({ publicQ, expected }, where) => {
+          const opts = publicQ.options!;
+          const vals = opts.map(optionValue);
+          if (vals.some((v) => v === null)) {
+            applicable = false;
+            return;
+          }
+          const key = vals[opts.indexOf(expected as string)]!;
+          expect(vals.filter((v) => Math.abs(v! - key) < 1e-9), `${where}: another option equals the key in value`).toHaveLength(1);
+          const rank = vals.filter((v) => v! < key - 1e-9).length;
+          if (opts.length === 4) {
+            counts[rank]++;
+            n++;
+          }
+        }, SEEDS_200.slice(0, 100));
+        if (!applicable || n === 0) return;
+        expect(Math.max(...counts) / n, `key has the same value rank too often: ${counts}`).toBeLessThanOrEqual(0.65);
+        expect(counts[0] / n, `key is never the smallest: ${counts}`).toBeGreaterThanOrEqual(0.08);
+        expect(counts[3] / n, `key is never the largest: ${counts}`).toBeGreaterThanOrEqual(0.08);
+      });
+    }
+  });
+}
