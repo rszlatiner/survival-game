@@ -163,7 +163,7 @@ describe("tiebreak", () => {
 
   it("startTiebreak throws NO_QUESTIONS when the units have no templates", () => {
     const tied = tiedAt([5, 5]);
-    expect(errCode(() => startTiebreak({ ...tied, units: [5] }, T))).toBe("NO_QUESTIONS");
+    expect(errCode(() => startTiebreak({ ...tied, units: [99] }, T))).toBe("NO_QUESTIONS");
   });
 
   it("submitAnswer accepts tied captains only during a tiebreak", () => {

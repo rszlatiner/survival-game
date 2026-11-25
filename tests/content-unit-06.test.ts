@@ -100,7 +100,7 @@ describe("unit 6 independent recompute", () => {
     }));
   it("two-way-01", () =>
     run("u06-two-way-01", (p, e) => {
-      const m = /^(\d+) islanders.*?\. (\d+) of them are adults\. (\d+) adults and (\d+) children/.exec(p)!;
+      const m = /, (\d+) islanders.*?\. (\d+) of them are adults\. (\d+) adults and (\d+) children/.exec(p)!;
       const [total, adults, , y] = m.slice(1).map(Number);
       expect(total - adults - y).toBe(e);
     }));
@@ -134,7 +134,7 @@ describe("unit 6 independent recompute", () => {
     }));
   it("best-average-01: outlier gives median, categories give mode, totals give mean", () =>
     run("u06-best-average-01", (p, e) => {
-      const want = /Fish caught in six days/.test(p) ? "The median" : /vote on sail colour/.test(p) ? "The mode" : "The mean";
+      const want = /in six days are/.test(p) ? "The median" : /vote on sail colour/.test(p) ? "The mode" : "The mean";
       expect(e).toBe(want);
       if (want === "The median") {
         const v = numsIn(p.slice(p.indexOf("days are")).replace("days are", ""));

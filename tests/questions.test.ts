@@ -282,8 +282,8 @@ describe("unitReadiness", () => {
     for (const d of [1, 2, 3] as Difficulty[]) expect(r.perDifficulty[d]).toBeGreaterThanOrEqual(4);
   });
 
-  it("unit 5 is not ready (no templates yet)", () => {
-    expect(unitReadiness(5)).toEqual({ ready: false, count: 0, perDifficulty: { 1: 0, 2: 0, 3: 0 } });
+  it("a unit with no templates is not ready", () => {
+    expect(unitReadiness(99)).toEqual({ ready: false, count: 0, perDifficulty: { 1: 0, 2: 0, 3: 0 } });
   });
 
   it("needs both 12 templates and 4 of each difficulty", () => {

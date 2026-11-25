@@ -274,18 +274,18 @@ export const UNIT_06: QuestionTemplate[] = [
     resource: "food",
     format: CHOICE,
     params: (rng) => ({ total: int(rng, 60, 200), s: int(rng, 8, 20) }),
-    prompt: ({ total, s }) =>
-      `You want to know which food all ${total} islanders like best, but you can only ask ${s} people. Which method gives the fairest sample?`,
+    prompt: ({ total, s }, zone) =>
+      `${Z[zone].Place}, you want to know which food all ${total} islanders like best, but you can only ask ${s} people. Which method gives the fairest sample?`,
     options: ({ s }) => [
-      `Pick ${s} names at random from a list of all the islanders`,
-      `Ask the ${s} people who happen to be sitting nearest to you`,
-      `Ask ${s} of your friends, because they are easy to find`,
-      `Ask the ${s} people who volunteer first`,
+      `Pick ${s} names at random from a list`,
+      `Ask the ${s} people sitting nearest you`,
+      `Ask ${s} of your friends`,
+      `Ask the ${s} who volunteer first`,
     ],
-    expected: ({ s }) => `Pick ${s} names at random from a list of all the islanders`,
+    expected: ({ s }) => `Pick ${s} names at random from a list`,
     solution: ({ s, total }) =>
-      `A fair sample gives every one of the ${total} islanders an equal chance of being chosen. Picking ${s} names at random from a list of everyone does this; the other methods favour certain people. ` +
-      `So the best choice is: Pick ${s} names at random from a list of all the islanders.`,
+      `A fair sample gives every one of the ${total} islanders an equal chance of being chosen. Picking names at random from a list of everyone does this; the other methods favour certain people. ` +
+      `So the best choice is: Pick ${s} names at random from a list.`,
   },
   {
     id: "u06-two-way-01",
@@ -297,8 +297,8 @@ export const UNIT_06: QuestionTemplate[] = [
       const kids = int(rng, 8, 20);
       return { adults: int(rng, 10, 30), kids, x: int(rng, 3, 9), y: int(rng, 2, kids - 2) };
     },
-    prompt: ({ adults, kids, x, y }) =>
-      `${adults + kids} islanders vote on a raft design. ${adults} of them are adults. ${x} adults and ${y} children vote for the round raft. ` +
+    prompt: ({ adults, kids, x, y }, zone) =>
+      `${Z[zone].Place}, ${adults + kids} islanders vote on a raft design. ${adults} of them are adults. ${x} adults and ${y} children vote for the round raft. ` +
       `How many children do not vote for the round raft?`,
     expected: ({ kids, y }) => kids - y,
     solution: ({ adults, kids, x, y }) =>
@@ -408,8 +408,8 @@ export const UNIT_06: QuestionTemplate[] = [
     },
     prompt: ({ k, a, b, c, d, e, big, r, s, t, days }, zone) =>
       [
-        `Fish caught in six days are ${a}, ${b}, ${c}, ${d}, ${e} and ${big}. Which average best describes a typical day?`,
-        `In a vote on sail colour, red gets ${r + t}, blue gets ${r} and green gets ${s}. Which average tells you the most popular colour?`,
+        `${Z[zone].Place}, the ${Z[zone].food} you catch in six days are ${a}, ${b}, ${c}, ${d}, ${e} and ${big}. Which average best describes a typical day?`,
+        `${Z[zone].Place}, a vote on sail colour gives red ${r + t}, blue ${r} and green ${s}. Which average tells you the most popular colour?`,
         `${Z[zone].Place}, the ${Z[zone].food} caught on five days are ${a + 3}, ${b + 3}, ${c + 3}, ${d + 3} and ${e + 3}. You want to estimate the total for ${days} days. Which average helps most?`,
       ][k],
     options: () => AVERAGES,

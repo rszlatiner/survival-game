@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { isCorrect, parseNumeric } from "@/lib/answers";
+import { MAX_ANSWER_LENGTH } from "@/lib/config";
 import { ZONE_IDS, RESOURCES, type QuestionTemplate, type ZoneId } from "@/lib/questions/types";
 import { generateQuestion } from "@/lib/questions/generate";
 import { unitReadiness } from "@/lib/questions/ready";
@@ -124,6 +125,8 @@ export function bankChecks(unit: number, bank: QuestionTemplate[]) {
             expect(opts.length, where).toBeGreaterThanOrEqual(3);
             expect(new Set(opts).size, where).toBe(opts.length);
             for (const o of opts) expect(o.trim().length, where).toBeGreaterThan(0);
+            // The API rejects any submitted answer longer than this, so every option must fit.
+            for (const o of opts) expect(o.length, `${where} option too long for the answer limit`).toBeLessThanOrEqual(MAX_ANSWER_LENGTH);
             expect(opts.filter((o) => o === expected).length, where).toBe(1);
             expect(solution, where).toContain(expected as string);
             total++;
@@ -179,6 +182,13 @@ export function bankChecks(unit: number, bank: QuestionTemplate[]) {
           const prompts = bank.map((t) => generateQuestion(t, zone, String(s)).publicQ.prompt);
           expect(new Set(prompts).size, `${zone} seed ${s}`).toBe(bank.length);
         }
+      }
+    });
+
+    it("every prompt changes with the zone (zone nouns are used)", () => {
+      for (const t of bank) {
+        const prompts = ZONE_IDS.map((z) => generateQuestion(t, z, "zone-check").publicQ.prompt);
+        expect(new Set(prompts).size, t.id).toBe(ZONE_IDS.length);
       }
     });
 
