@@ -121,7 +121,7 @@ describe("unit 7 independent recompute", () => {
       const a = numsIn(p)[0];
       // 1 m by 1 m is 100 cm by 100 cm.
       if (/in cm²/.test(p)) expect(e).toBe(a * 100 * 100);
-      else expect(e * 100 * 100).toBe(a);
+      else expect(Number(e) * 100 * 100).toBe(a);
     }));
   it("window-01: rectangle plus half a circle of the stated diameter", () =>
     run("u07-window-01", (p, e) => {
