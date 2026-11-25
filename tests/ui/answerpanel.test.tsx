@@ -251,6 +251,16 @@ describe("typing filters", () => {
     await user.type(input, "3x²+√(y)×2 !@#<>");
     expect(input.value).toBe("3x²+√(y)×2 ");
   });
+  it("expression format lets = through (y = 3x+2)", async () => {
+    const e = setup(EXPR);
+    await e.user.type(e.input, "y=3x+2");
+    expect(e.input.value).toBe("y=3x+2");
+  });
+  it("numeric formats still drop =", async () => {
+    const n = setup(INT);
+    await n.user.type(n.input, "3=4");
+    expect(n.input.value).toBe("34");
+  });
   it("a rejected key does not move the caret", async () => {
     const { user, input, select } = setup(INT);
     await user.type(input, "12");

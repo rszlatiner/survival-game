@@ -318,4 +318,18 @@ describe("expression format", () => {
   it("parseNumeric returns null for the expression format", () => {
     expect(parseNumeric("3", ex)).toBeNull();
   });
+  it("ignores a leading single-letter 'y =' the answer does not use", () => {
+    expect(isCorrect("y=3x+2", "3x+2", ex)).toBe(true);
+    expect(isCorrect(" y = 2+3x ", "3x+2", ex)).toBe(true);
+    expect(isCorrect("y=3x+3", "3x+2", ex)).toBe(false);
+  });
+  it("does not let the prefix change the meaning", () => {
+    expect(isCorrect("x=3x+2", "3x+2", ex)).toBe(false);
+    expect(isCorrect("ab=3x+2", "3x+2", ex)).toBe(false);
+    expect(isCorrect("y=y=3x+2", "3x+2", ex)).toBe(false);
+    expect(isCorrect("3x=3x+2", "3x+2", ex)).toBe(false);
+    expect(isCorrect("=3x+2", "3x+2", ex)).toBe(false);
+    expect(isCorrect("y=", "3x+2", ex)).toBe(false);
+    expect(isCorrect("y=3x+2", "y+1", ex)).toBe(false);
+  });
 });

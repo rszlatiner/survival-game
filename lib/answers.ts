@@ -162,10 +162,18 @@ const MIN_VALID_POINTS = 5;
  */
 function expressionsEquivalent(input: string, expected: string): boolean {
   if (typeof input !== "string") return false;
-  const a = parseExpr(input.trim());
   const b = parseExpr(expected);
-  if (a === null || b === null) return false;
+  if (b === null) return false;
   const vars = variablesOf(b);
+  let text = input.trim();
+  // A leading "y =" is the name of the answer, not part of it. Only a single letter that the
+  // expected answer does not use may be dropped, so "x = 3x+2" is never read as "3x+2".
+  if (!expected.includes("=")) {
+    const m = /^([a-zA-Z])\s*=([^=]*)$/.exec(text);
+    if (m && !vars.includes(m[1])) text = m[2];
+  }
+  const a = parseExpr(text.trim());
+  if (a === null) return false;
   if (variablesOf(a).some((v) => !vars.includes(v))) return false;
   let valid = 0;
   for (let i = 0; i < SAMPLES.length; i++) {

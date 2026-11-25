@@ -9,7 +9,7 @@ import { bigField, btn, card, label } from "@/components/ui/styles";
 /** Characters any typed answer may contain (numeric formats stop here). */
 const BASE_CHARS = "0123456789.,-/%^()*+ ";
 /** Expression answers also allow letters and the unicode maths signs. */
-const EXPR_CHARS = BASE_CHARS + "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ√×÷²³·−";
+const EXPR_CHARS = BASE_CHARS + "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ√×÷²³·−=";
 
 /** Original numeric sets, used unless the question sets allowExpression. */
 const PLAIN_CHARS: Record<string, string> = {
