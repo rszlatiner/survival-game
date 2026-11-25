@@ -11,6 +11,7 @@
 import type { QuestionTemplate } from "@/lib/questions/types";
 import { coprimePair, gcd, int } from "@/lib/questions/random";
 import { ZONE_WORDS as Z } from "@/content/units/zones";
+import { pickRanked } from "@/content/units/rankpick";
 
 const INT = { kind: "integer" } as const;
 const DEC = { kind: "decimal", places: 2 } as const;
@@ -352,27 +353,24 @@ export const UNIT_12: QuestionTemplate[] = [
     resource: "water",
     format: CHOICE,
     params: (rng) => {
-      const S = [90, 110, 120, 80, 110, 100][int(rng, 0, 5)];
+      const S = [100, 100, 100, 90, 110, 120, 80, 130][int(rng, 0, 7)];
       for (let i = 0; i < 200; i++) {
         const q1 = 5 * int(rng, 2, 12);
         const q2 = 5 * int(rng, 2, 12);
         const q3 = S - q1 - q2;
-        if (q3 >= 10 && q3 <= 60) return { q1, q2, q3, S, rot: int(rng, 0, 3) };
+        if (q3 >= 10 && q3 <= 60) return { q1, q2, q3, S, t: int(rng, 0, 3), tie: int(rng, 0, 999) };
       }
-      return { q1: 30, q2: 40, q3: 30, S: 100, rot: 0 };
+      return { q1: 30, q2: 40, q3: 30, S: 100, t: 0, tie: 0 };
     },
     prompt: ({ q1, q2, q3 }, zone) =>
       `${Z[zone].Place}, a friend says a spinner with three colours has probabilities ${dec(q1)} for red, ${dec(q2)} for blue and ${dec(q3)} for green, ` +
       `and no other outcomes. Which statement is correct?`,
-    // Every option is self-consistent: "Possible" goes only with a total of exactly 1.
-    options: ({ S, rot }) => {
-      const near = [S + 10, S - 10, S + 20, S - 20, S + 30].filter((v) => v !== 100 && v > 0);
-      const wrong: number[] = S === 100 ? [] : [100];
-      for (let i = 0; wrong.length < 3; i++) {
-        const v = near[(i + rot) % near.length];
-        if (v !== S && !wrong.includes(v)) wrong.push(v);
-      }
-      return [S, ...wrong].map((T) => `${T === 100 ? "Possible" : "Not possible"}, the total is ${tot(T)}`);
+    // Every option is self-consistent: "Possible" goes only with a total of exactly 1. The wrong totals are slips
+    // of adding; the key's rank by total is chosen by the seed.
+    options: ({ S, t, tie }) => {
+      const text = (T: number) => `${T === 100 ? "Possible" : "Not possible"}, the total is ${tot(T)}`;
+      const slips = [S + 10, S - 10, S + 20, S - 20, S + 30, S - 30, S + 40, S - 40].filter((v) => v > 0 && v !== S && v !== 100);
+      return pickRanked(text(S), slips.map(text), [(o) => Number(/\d\.\d\d/.exec(o)![0])], [t], tie, S === 100 ? [] : [text(100)]);
     },
     expected: ({ S }) => `${S === 100 ? "Possible" : "Not possible"}, the total is ${tot(S)}`,
     solution: ({ q1, q2, q3, S }) =>

@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_12 } from "@/content/units/unit-12";
 import { generateQuestion } from "@/lib/questions/generate";
+import { coordRankChecks } from "./helpers/rank2";
 import { bankChecks, overlapChecks, coordinateChecks, eachQuestion, numsIn } from "./helpers/bank";
 
 bankChecks(12, UNIT_12);
 overlapChecks(UNIT_12);
 coordinateChecks(UNIT_12);
+coordRankChecks(UNIT_12, ["u12-claim-03"]);
 
 const get = (id: string) => UNIT_12.find((t) => t.id === id)!;
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
