@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import * as React from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -157,6 +158,38 @@ describe("create game form", () => {
 });
 
 describe("host screen", () => {
+  it("shows the new phase right after a successful start, without waiting for a ping", async () => {
+    asHost();
+    const lobby = state({ phase: "lobby", round: null, version: 1 });
+    const started = state({ phase: "question", version: 2 });
+    h.useGameState.mockImplementation(() => {
+      const [cur, setCur] = React.useState<PublicGameState>(lobby);
+      return { state: cur, status: "live", applyState: setCur };
+    });
+    h.postHost.mockResolvedValue(started);
+    const user = userEvent.setup();
+    render(<HostPlay code="ABCDEF" />);
+    expect((await screen.findByTestId("phase")).textContent).toMatch(/lobby/i);
+    await user.click(screen.getByRole("button", { name: /start game/i }));
+    await waitFor(() => expect(screen.getByTestId("phase").textContent).toMatch(/question/i));
+  });
+
+  it("shows a hint next to the disabled Start button when there are no teams", async () => {
+    asHost();
+    setGame(state({ phase: "lobby", round: null, teams: [] }));
+    render(<HostPlay code="ABCDEF" />);
+    expect((await screen.findByRole("button", { name: /start game/i }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Start unlocks when at least one team has joined.")).toBeTruthy();
+  });
+
+  it("hides the hint once a team has joined", async () => {
+    asHost();
+    setGame(state({ phase: "lobby", round: null }));
+    render(<HostPlay code="ABCDEF" />);
+    await screen.findByRole("button", { name: /start game/i });
+    expect(screen.queryByText(/start unlocks/i)).toBeNull();
+  });
+
   it("Next round is disabled during the question phase; Reveal is enabled", async () => {
     asHost();
     setGame(state());

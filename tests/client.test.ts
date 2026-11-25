@@ -28,7 +28,7 @@ class FakeChannel {
 }
 
 let root: Root | null = null;
-let latest: { state: PublicGameState | null; status: GameStatus } = { state: null, status: "polling" };
+let latest: { state: PublicGameState | null; status: GameStatus; applyState: (n: PublicGameState) => void } = { state: null, status: "polling", applyState: () => {} };
 let renders = 0;
 
 function mount(code: string, factory?: ChannelFactory) {
@@ -57,7 +57,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   fetchMock = vi.fn(async () => ok(st(1)));
   vi.stubGlobal("fetch", fetchMock);
-  latest = { state: null, status: "polling" };
+  latest = { state: null, status: "polling", applyState: () => {} };
   localStorage.clear();
 });
 
@@ -70,6 +70,34 @@ afterEach(() => {
 });
 
 describe("useGameState", () => {
+  it("applyState applies a higher version, ignores a lower one, and keeps a stable identity", async () => {
+    mount("ABCDEF");
+    await tick(0);
+    expect(latest.state?.version).toBe(1);
+    const apply = latest.applyState;
+    fetchMock.mockResolvedValue(ok(st(5)));
+    await act(async () => apply(st(5)));
+    expect(latest.state?.version).toBe(5);
+    fetchMock.mockResolvedValue(ok(st(3)));
+    await act(async () => apply(st(3)));
+    await tick(0);
+    expect(latest.state?.version).toBe(5);
+    expect(latest.applyState).toBe(apply);
+  });
+
+  it("applyState shows the state immediately, then refreshes once through the guarded loader", async () => {
+    mount("ABCDEF");
+    await tick(0);
+    const before = fetchMock.mock.calls.length;
+    let release!: (r: Response) => void;
+    fetchMock.mockImplementation(() => new Promise<Response>((res) => (release = res)));
+    act(() => latest.applyState(st(6)));
+    expect(latest.state?.version).toBe(6); // shown before the refresh resolves
+    await act(async () => release(ok(st(7))));
+    expect(fetchMock.mock.calls.length - before).toBe(1);
+    expect(latest.state?.version).toBe(7);
+  });
+
   it("shows state fetched on mount and after a pushed ping", async () => {
     const ch = new FakeChannel();
     mount("ABCDEF", ch.factory);

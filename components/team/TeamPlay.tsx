@@ -16,7 +16,7 @@ export function TeamPlay({ code: rawCode }: { code: string }) {
   const router = useRouter();
   const [auth, setAuth] = useState<Auth>({ kind: "checking" });
   const [attempt, setAttempt] = useState(0);
-  const { state, status } = useGameState(code);
+  const { state, status, applyState } = useGameState(code);
 
   useEffect(() => {
     let off = false;
@@ -45,7 +45,14 @@ export function TeamPlay({ code: rawCode }: { code: string }) {
     };
   }, [code, attempt]);
 
-  const send = useCallback((a: Parameters<typeof postTeam>[1]) => postTeam(code, a), [code]);
+  const send = useCallback(
+    async (a: Parameters<typeof postTeam>[1]) => {
+      const next = await postTeam(code, a);
+      if (next && typeof next === "object" && "version" in next) applyState(next);
+      return next;
+    },
+    [code, applyState],
+  );
   const fetchSuggestions = useCallback(() => getSuggestions(code), [code]);
 
   if (auth.kind === "checking") return <p className="p-6 text-white">Loading...</p>;

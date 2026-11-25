@@ -12,14 +12,21 @@ import { HostSignIn } from "./HostSignIn";
 export function HostPlay({ code: rawCode }: { code: string }) {
   const code = rawCode.toUpperCase();
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
-  const { state, status } = useGameState(code);
+  const { state, status, applyState } = useGameState(code);
 
   useEffect(() => {
     const s = loadSession(code);
     setSignedIn(!!s && s.role === "host");
   }, [code]);
 
-  const send = useCallback((a: HostAction) => postHost(code, a), [code]);
+  const send = useCallback(
+    async (a: HostAction) => {
+      const next = await postHost(code, a);
+      if (next && typeof next === "object" && "version" in next) applyState(next);
+      return next;
+    },
+    [code, applyState],
+  );
 
   if (signedIn === null) return <p className="p-6 text-white">Loading...</p>;
   if (!signedIn) {

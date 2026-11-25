@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicGameState } from "@/lib/engine/public";
 import { fetchState } from "./api";
 import { defaultChannelFactory, type ChannelFactory } from "./realtime";
@@ -19,11 +19,14 @@ export const OFFLINE_AFTER_FAILURES = 3;
 export function useGameState(
   code: string,
   options?: { createChannel?: ChannelFactory },
-): { state: PublicGameState | null; status: GameStatus } {
+): { state: PublicGameState | null; status: GameStatus; applyState: (next: PublicGameState) => void } {
   const [state, setState] = useState<PublicGameState | null>(null);
   const [status, setStatus] = useState<GameStatus>("polling");
   const factoryRef = useRef(options?.createChannel);
   factoryRef.current = options?.createChannel;
+  const applyRef = useRef<(next: PublicGameState) => void>(() => {});
+  /** Stable. Applies a state returned by an action through the same version guard, then refreshes once. */
+  const applyState = useCallback((next: PublicGameState) => applyRef.current(next), []);
 
   useEffect(() => {
     let disposed = false;
@@ -62,6 +65,13 @@ export function useGameState(
       schedule();
     };
 
+    const show = (next: PublicGameState) => {
+      if (next.version >= shown) {
+        shown = next.version;
+        setState(next);
+      }
+    };
+
     const load = async () => {
       if (disposed) return;
       if (inFlight) {
@@ -75,10 +85,7 @@ export function useGameState(
         if (disposed) return;
         failures = 0;
         offlineFlag = false;
-        if (next.version >= shown) {
-          shown = next.version;
-          setState(next);
-        }
+        show(next);
       } catch {
         if (disposed) return;
         failures++;
@@ -145,12 +152,19 @@ export function useGameState(
       window.addEventListener("online", onOnline);
     }
 
+    applyRef.current = (next) => {
+      if (disposed) return;
+      show(next);
+      void load(); // settle time-derived fields through the guarded loader
+    };
+
     report();
     schedule();
     void load();
 
     return () => {
       disposed = true;
+      applyRef.current = () => {};
       if (tick) clearInterval(tick);
       if (silence) clearTimeout(silence);
       inFlight?.abort();
@@ -166,5 +180,5 @@ export function useGameState(
     };
   }, [code]);
 
-  return { state, status };
+  return { state, status, applyState };
 }

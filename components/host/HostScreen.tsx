@@ -117,6 +117,9 @@ export function HostScreen({ state, status, send, login }: Props) {
                 Start game
               </button>
             )}
+            {phase === "lobby" && state.teams.length === 0 && (
+              <p data-testid="start-hint" className="self-center text-sm text-amber-300">Start unlocks when at least one team has joined.</p>
+            )}
             <button type="button" disabled={!canNext} onClick={() => void act({ type: "next" })} className={`${btn} bg-sky-600`}>
               {nextLabel}
             </button>

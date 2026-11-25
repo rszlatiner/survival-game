@@ -116,6 +116,19 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("team screen", () => {
+  it("applies the state returned by an action immediately", async () => {
+    asDevice(0);
+    const applyState = vi.fn();
+    h.useGameState.mockReturnValue({ state: state(), status: "live", applyState });
+    const next = state({ version: 9 });
+    h.postTeam.mockResolvedValue(next);
+    const user = userEvent.setup();
+    render(<TeamPlay code="ABCDEF" />);
+    await user.type(await screen.findByRole("textbox"), "36");
+    await user.click(screen.getByRole("button", { name: /submit/i }));
+    await waitFor(() => expect(applyState).toHaveBeenCalledWith(next));
+  });
+
   it("non-captain sees Suggest and no Submit", async () => {
     asDevice(1);
     setGame(state());
