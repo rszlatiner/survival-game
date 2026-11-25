@@ -1,3 +1,4 @@
+import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/api/parse";
 import { ALL_TEMPLATES } from "@/content/units";
 import { MAX_ANSWER_LENGTH, MAX_OVERRIDE } from "@/lib/config";
 import { GameError } from "@/lib/engine/game";
@@ -29,6 +30,28 @@ export function extendTimer(g: GameState, seconds: number): GameState {
   const round = openRound(g);
   if (!Number.isInteger(seconds) || seconds <= 0) throw new GameError("BAD_AMOUNT", String(seconds));
   return bump(g, { round: { ...round, endsAt: round.endsAt + seconds * 1000 } });
+}
+
+/**
+ * Cuts `seconds` (1 to TIMER_MAX_SECONDS) off the open question's timer, never
+ * below `now`: if it reaches now the timer is expired. Not idempotent: each call cuts.
+ */
+export function shortenTimer(g: GameState, seconds: number, now: number): GameState {
+  const round = openRound(g);
+  if (!Number.isInteger(seconds) || seconds < 1 || seconds > TIMER_MAX_SECONDS) throw new GameError("BAD_AMOUNT", String(seconds));
+  return bump(g, { round: { ...round, endsAt: Math.max(now, round.endsAt - seconds * 1000) } });
+}
+
+/**
+ * Sets the per-question timer used by every FUTURE round (and skip). Allowed
+ * any time before the game is finished; never changes a running round's end. Logged.
+ */
+export function setTimerSeconds(g: GameState, seconds: number): GameState {
+  if (g.phase === "finished") throw new GameError("WRONG_PHASE");
+  if (!Number.isInteger(seconds) || seconds < TIMER_MIN_SECONDS || seconds > TIMER_MAX_SECONDS) {
+    throw new GameError("BAD_AMOUNT", String(seconds));
+  }
+  return bump(g, { timerSeconds: seconds, log: [...g.log, `timer ${seconds}s`] });
 }
 
 const skipMarker = (n: number) => `skipped r${n}`;

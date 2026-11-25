@@ -364,6 +364,88 @@ describe("host screen", () => {
     expect(h.postHost).toHaveBeenCalledWith("ABCDEF", { type: "extend", seconds: 45 });
   });
 
+  it("shorten buttons post the right seconds and are disabled while busy", async () => {
+    asHost();
+    setGame(state());
+    let release: () => void = () => {};
+    h.postHost.mockReturnValueOnce(new Promise<void>((r) => (release = r)));
+    const user = userEvent.setup();
+    render(<HostPlay code="ABCDEF" />);
+    const m10 = await screen.findByRole("button", { name: /shorten this question by 10 seconds/i });
+    const m30 = screen.getByRole("button", { name: /shorten this question by 30 seconds/i });
+    expect(m10.textContent).toMatch(/-10 s/);
+    await user.click(m10);
+    expect(h.postHost).toHaveBeenCalledWith("ABCDEF", { type: "shorten", seconds: 10 });
+    expect((m10 as HTMLButtonElement).disabled).toBe(true);
+    expect((m30 as HTMLButtonElement).disabled).toBe(true);
+    release();
+    await waitFor(() => expect((m30 as HTMLButtonElement).disabled).toBe(false));
+    await user.click(m30);
+    expect(h.postHost).toHaveBeenLastCalledWith("ABCDEF", { type: "shorten", seconds: 30 });
+  });
+
+  it("shorten buttons are hidden outside a running question", async () => {
+    asHost();
+    setGame(state({ phase: "reveal" }));
+    render(<HostPlay code="ABCDEF" />);
+    await screen.findByText(/host screen/i);
+    expect(screen.queryByRole("button", { name: /shorten this question/i })).toBeNull();
+  });
+
+  it("time per question shows the current value and presets call setTimer", async () => {
+    asHost();
+    setGame(state({ timerSeconds: 75 }));
+    const user = userEvent.setup();
+    render(<HostPlay code="ABCDEF" />);
+    const group = await screen.findByRole("group", { name: /time per question/i });
+    expect(within(group).getByText(/currently 75 s/i)).toBeTruthy();
+    for (const p of [15, 30, 45, 60, 90, 120]) {
+      await user.click(within(group).getByRole("button", { name: `Set time per question to ${p} seconds` }));
+      expect(h.postHost).toHaveBeenLastCalledWith("ABCDEF", { type: "setTimer", seconds: p });
+    }
+  });
+
+  it("time per question custom value is validated then posted", async () => {
+    asHost();
+    setGame(state({ phase: "lobby", round: null }));
+    const user = userEvent.setup();
+    render(<HostPlay code="ABCDEF" />);
+    const input = await screen.findByLabelText(/custom seconds per question/i);
+    await user.clear(input);
+    await user.type(input, "9");
+    await user.click(screen.getByRole("button", { name: /set custom time/i }));
+    expect(h.postHost).not.toHaveBeenCalled();
+    await user.clear(input);
+    await user.type(input, "50");
+    await user.click(screen.getByRole("button", { name: /set custom time/i }));
+    expect(h.postHost).toHaveBeenCalledWith("ABCDEF", { type: "setTimer", seconds: 50 });
+  });
+
+  it("time per question is available between rounds and hidden when finished", async () => {
+    asHost();
+    setGame(state({ phase: "reveal" }));
+    const { unmount } = render(<HostPlay code="ABCDEF" />);
+    expect(await screen.findByRole("group", { name: /time per question/i })).toBeTruthy();
+    unmount();
+    cleanup();
+    setGame(state({ phase: "finished" }));
+    render(<HostPlay code="ABCDEF" />);
+    await screen.findByText(/game over/i);
+    expect(screen.queryByRole("group", { name: /time per question/i })).toBeNull();
+    expect(screen.queryByLabelText(/custom seconds per question/i)).toBeNull();
+  });
+
+  it("create form: timer presets fill the field and the hint is shown", async () => {
+    const user = userEvent.setup();
+    render(<CreateGame readiness={readiness} />);
+    expect(screen.getByText(/you can change this during the game/i)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Use 45 seconds per question" }));
+    expect((screen.getByRole("textbox", { name: /^seconds per question/i }) as HTMLInputElement).value).toBe("45");
+    await user.type(screen.getByLabelText(/teacher password/i), "pw");
+    await user.click(screen.getByRole("button", { name: /create game/i }));
+    expect(h.createGame).toHaveBeenCalledWith(expect.objectContaining({ timerSeconds: 45 }));
+  });
+
   it("tiebreak shows a Reveal button that posts reveal, and Next is disabled", async () => {
     asHost();
     setGame(state({ phase: "tiebreak", tiedIds: ["t1", "t2"] }));

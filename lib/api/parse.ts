@@ -21,7 +21,7 @@ export interface JoinBody {
 
 export type HostAction =
   | { type: "start" | "next" | "reveal" | "skip" | "end" }
-  | { type: "extend"; seconds: number }
+  | { type: "extend" | "shorten" | "setTimer"; seconds: number }
   | { type: "setCaptain"; teamId: string; deviceIndex: number }
   | { type: "rename"; teamId: string; name: string }
   | { type: "remove" | "resetDevices"; teamId: string }
@@ -111,11 +111,15 @@ function answer(o: Record<string, unknown>): string {
 export function parseHostAction(x: unknown): HostAction {
   const o = obj(x);
   const type = oneOf(o, "type", [
-    "start", "next", "reveal", "skip", "end", "extend", "setCaptain", "rename", "remove", "resetDevices", "override",
+    "start", "next", "reveal", "skip", "end", "extend", "shorten", "setTimer", "setCaptain", "rename", "remove", "resetDevices", "override",
   ] as const);
   switch (type) {
     case "extend":
       return { type, seconds: int(o, "seconds", 1, TIMER_MAX_SECONDS) };
+    case "shorten":
+      return { type, seconds: int(o, "seconds", 1, TIMER_MAX_SECONDS) };
+    case "setTimer":
+      return { type, seconds: int(o, "seconds", TIMER_MIN_SECONDS, TIMER_MAX_SECONDS) };
     case "setCaptain":
       return { type, teamId: str(o, "teamId", ID_MAX), deviceIndex: int(o, "deviceIndex", 0, 100) };
     case "rename":

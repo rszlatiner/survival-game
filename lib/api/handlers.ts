@@ -13,7 +13,7 @@ import {
   startGame,
 } from "@/lib/engine/game";
 import { contribute, resolveHazard, resolveRaider } from "@/lib/engine/hazard";
-import { endGame, extendTimer, overrideTeam, resetDevices, skipQuestion, suggestAnswer } from "@/lib/engine/host";
+import { endGame, extendTimer, overrideTeam, resetDevices, setTimerSeconds, shortenTimer, skipQuestion, suggestAnswer } from "@/lib/engine/host";
 import { toPublicState, type PublicGameState } from "@/lib/engine/public";
 import { revealRound, startRound, submitAnswer } from "@/lib/engine/round";
 import { checkRaft, checkWinner, finishTiebreak, startTiebreak } from "@/lib/engine/win";
@@ -283,6 +283,10 @@ function applyHost(g: GameState, a: HostAction, now: number): GameState {
       return reveal(g);
     case "extend":
       return extendTimer(g, a.seconds);
+    case "shorten":
+      return shortenTimer(g, a.seconds, now);
+    case "setTimer":
+      return setTimerSeconds(g, a.seconds);
     case "skip":
       return skipQuestion(g, now);
     case "end":

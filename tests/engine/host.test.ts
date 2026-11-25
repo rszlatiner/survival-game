@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ROUNDS } from "@/lib/config";
-import { endGame, extendTimer, overrideTeam, skipQuestion, suggestAnswer } from "@/lib/engine/host";
+import { endGame, extendTimer, overrideTeam, setTimerSeconds, shortenTimer, skipQuestion, suggestAnswer } from "@/lib/engine/host";
 import { addTeam, createGame, joinTeam } from "@/lib/engine/game";
 import { revealRound } from "@/lib/engine/round";
 import { checkRaft, checkWinner } from "@/lib/engine/win";
@@ -26,6 +26,57 @@ describe("extendTimer", () => {
     expect(errCode(() => extendTimer(g, 1.5))).toBe("BAD_AMOUNT");
     expect(errCode(() => extendTimer(revealGame(), 30))).toBe("WRONG_PHASE");
     expect(errCode(() => extendTimer(startedGame(), 30))).toBe("WRONG_PHASE");
+  });
+});
+
+describe("shortenTimer", () => {
+  it("cuts the running question's time and bumps the version", () => {
+    const g = questionGame();
+    const now = g.round!.startedAt;
+    const n = shortenTimer(g, 10, now);
+    expect(n.round!.endsAt).toBe(g.round!.endsAt - 10_000);
+    expect(n.version).toBe(g.version + 1);
+  });
+
+  it("never goes below now (the timer is simply expired)", () => {
+    const g = questionGame();
+    const now = g.round!.endsAt - 5_000;
+    expect(shortenTimer(g, 600, now).round!.endsAt).toBe(now);
+    const late = g.round!.endsAt + 9_000;
+    expect(shortenTimer(g, 10, late).round!.endsAt).toBe(late);
+  });
+
+  it("rejects bad amounts and works only while a question is open", () => {
+    const g = questionGame();
+    for (const bad of [0, -1, 1.5, 601, NaN]) expect(errCode(() => shortenTimer(g, bad, NOW))).toBe("BAD_AMOUNT");
+    expect(errCode(() => shortenTimer(revealGame(), 10, NOW))).toBe("WRONG_PHASE");
+    expect(errCode(() => shortenTimer(startedGame(), 10, NOW))).toBe("WRONG_PHASE");
+  });
+});
+
+describe("setTimerSeconds", () => {
+  it("changes the timer for future rounds only, logs it and bumps the version", () => {
+    const g = questionGame();
+    const n = setTimerSeconds(g, 45);
+    expect(n.timerSeconds).toBe(45);
+    expect(n.round!.endsAt).toBe(g.round!.endsAt);
+    expect(n.version).toBe(g.version + 1);
+    expect(n.log[n.log.length - 1]).toBe("timer 45s");
+  });
+
+  it("is allowed in the lobby and at reveal, and the next skip uses it", () => {
+    expect(setTimerSeconds(createGame({ units: [11], length: "quick", timerSeconds: 90, seed: "s", code: "ABC234", now: 0 }), 30).timerSeconds).toBe(30);
+    expect(setTimerSeconds(revealGame(), 30).timerSeconds).toBe(30);
+    const skipped = skipQuestion(setTimerSeconds(questionGame(), 20), NOW);
+    expect(skipped.round!.endsAt).toBe(NOW + 20_000);
+  });
+
+  it("rejects out-of-range or non-integer values and a finished game", () => {
+    const g = questionGame();
+    for (const bad of [9, 601, 30.5, NaN, 0]) expect(errCode(() => setTimerSeconds(g, bad))).toBe("BAD_AMOUNT");
+    const done = endGame(questionGame(), NOW);
+    expect(done.phase).toBe("finished");
+    expect(errCode(() => setTimerSeconds(done, 30))).toBe("WRONG_PHASE");
   });
 });
 

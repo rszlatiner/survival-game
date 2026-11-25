@@ -7,6 +7,7 @@ import { ROUNDS } from "@/lib/config";
 import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/api/parse";
 import type { GameLength } from "@/lib/types";
 import { hostErrorText } from "./labels";
+import { TIMER_PRESETS } from "./timerPresets";
 import { Palm, TimerIcon, TreasureMapBorder } from "@/components/art";
 import { IslandBackdrop } from "@/components/ui/Backdrop";
 import { Wordmark } from "@/components/ui/Wordmark";
@@ -216,6 +217,21 @@ export function CreateGame({ readiness }: { readiness: UnitReadiness[] }) {
             onChange={(e) => setTimer(e.target.value)}
             className={`${field} mt-1 w-32`}
           />
+          <div role="group" aria-label="Timer presets" className="mt-2 flex flex-wrap gap-2">
+            {TIMER_PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                aria-label={`Use ${p} seconds per question`}
+                aria-pressed={timer === String(p)}
+                onClick={() => setTimer(String(p))}
+                className={btn(timer === String(p) ? "ocean" : "sand")}
+              >
+                {p} s
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-sm font-semibold">You can change this during the game.</p>
         </div>
 
         {notReady.length > 0 && (

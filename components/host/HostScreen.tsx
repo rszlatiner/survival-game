@@ -10,6 +10,8 @@ import { Toast } from "@/components/team/Toast";
 import { RESOURCE_LABEL } from "@/components/team/labels";
 import { HostSignIn } from "./HostSignIn";
 import { hostErrorText, isAuthLost } from "./labels";
+import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/api/parse";
+import { TIMER_PRESETS } from "./timerPresets";
 import { useCountdown } from "./useCountdown";
 import { CrownIcon, HazardIcon, RaftIcon, StarIcon, Sun, TimerIcon, TrophyIcon, ZONE_COLOR } from "@/components/art";
 import { IslandBackdrop } from "@/components/ui/Backdrop";
@@ -37,6 +39,7 @@ export function HostScreen({ state, status, send, login }: Props) {
   const [authLost, setAuthLost] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [extendBy, setExtendBy] = useState("30");
+  const [customTimer, setCustomTimer] = useState("");
   const remaining = useCountdown(state);
 
   const act = async (a: HostAction): Promise<boolean> => {
@@ -173,8 +176,62 @@ export function HostScreen({ state, status, send, login }: Props) {
                 <TimerIcon size={22} />
                 Extend timer
               </button>
+              {[10, 30].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={busy}
+                  aria-label={`Shorten this question by ${n} seconds`}
+                  onClick={() => void act({ type: "shorten", seconds: n })}
+                  className={tone("sand")}
+                >
+                  -{n} s
+                </button>
+              ))}
             </form>
           )}
+
+          <div role="group" aria-label="Time per question" className="space-y-2">
+            <p className="text-sm font-black">
+              Time per question (future rounds): <span data-testid="timer-current">currently {state.timerSeconds} s</span>
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              {TIMER_PRESETS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  disabled={busy}
+                  aria-label={`Set time per question to ${p} seconds`}
+                  aria-pressed={state.timerSeconds === p}
+                  onClick={() => void act({ type: "setTimer", seconds: p })}
+                  className={tone(state.timerSeconds === p ? "ocean" : "sand")}
+                >
+                  {p} s
+                </button>
+              ))}
+            </div>
+            <form
+              className="flex flex-wrap items-end gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const n = Number(customTimer);
+                if (!/^\d+$/.test(customTimer.trim()) || n < TIMER_MIN_SECONDS || n > TIMER_MAX_SECONDS) {
+                  setError(`Time per question must be a whole number from ${TIMER_MIN_SECONDS} to ${TIMER_MAX_SECONDS} seconds.`);
+                  return;
+                }
+                void act({ type: "setTimer", seconds: n }).then((ok) => ok && setCustomTimer(""));
+              }}
+            >
+              <label className="block">
+                <span className="block text-sm font-black">Custom seconds per question</span>
+                <input value={customTimer} onChange={(e) => setCustomTimer(e.target.value)} inputMode="numeric" className={`${field} w-24`} />
+              </label>
+              <button type="submit" disabled={busy} className={tone("night")}>
+                Set custom time
+              </button>
+            </form>
+            <p className="text-xs">Changes the next rounds only. The question running now keeps its time.</p>
+          </div>
 
           {phase === "tiebreak" && (
             <p className="bg-sunset-200 p-2 text-sm font-semibold text-void">

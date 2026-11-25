@@ -11,7 +11,7 @@ import {
   teamSuggestionsHandler,
   type HandlerEnv,
 } from "@/lib/api/handlers";
-import { parseCreateBody, parseHostAction, parseLoginBody, parseTeamAction } from "@/lib/api/parse";
+import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS, parseCreateBody, parseHostAction, parseLoginBody, parseTeamAction } from "@/lib/api/parse";
 import { signToken, verifyToken } from "@/lib/auth";
 import { ROUNDS } from "@/lib/config";
 import { checkWinner } from "@/lib/engine/win";
@@ -706,6 +706,68 @@ describe("one team per device (fix wave I2)", () => {
   it("parseHostAction accepts resetDevices with a team id only", () => {
     expect(parseHostAction({ type: "resetDevices", teamId: "t1" })).toEqual({ type: "resetDevices", teamId: "t1" });
     expect(() => parseHostAction({ type: "resetDevices" })).toThrow(ApiError);
+  });
+});
+
+describe("timer host actions", () => {
+  it("parseHostAction validates shorten and setTimer strictly", () => {
+    expect(parseHostAction({ type: "shorten", seconds: 10 })).toEqual({ type: "shorten", seconds: 10 });
+    expect(parseHostAction({ type: "setTimer", seconds: TIMER_MIN_SECONDS })).toEqual({ type: "setTimer", seconds: TIMER_MIN_SECONDS });
+    expect(parseHostAction({ type: "setTimer", seconds: TIMER_MAX_SECONDS })).toEqual({ type: "setTimer", seconds: TIMER_MAX_SECONDS });
+    for (const seconds of [0, -5, 601, 1.5, "30", null, undefined, NaN]) {
+      expect(() => parseHostAction({ type: "shorten", seconds })).toThrow(ApiError);
+    }
+    for (const seconds of [0, TIMER_MIN_SECONDS - 1, TIMER_MAX_SECONDS + 1, 30.5, "30", null, undefined, NaN]) {
+      expect(() => parseHostAction({ type: "setTimer", seconds })).toThrow(ApiError);
+    }
+    expect(() => parseHostAction({ type: "setTimer" })).toThrow(ApiError);
+  });
+
+  it("setTimer works in the lobby, is saved, logged and shown in the public state", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code, hostToken } = await newGame(repo, env);
+    const s = await hostActionHandler(repo, env, code, hostToken, { type: "setTimer", seconds: 30 }, T0 + 1);
+    expect(s.timerSeconds).toBe(30);
+    const stored = (await repo.get(code))!;
+    expect(stored.timerSeconds).toBe(30);
+    expect(stored.log).toContain("timer 30s");
+    await joinHandler(repo, env, code, { teamName: "A", deviceId: "d1" }, T0);
+    const q = await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0 + 2);
+    expect(q.round!.endsAt - q.round!.startedAt).toBe(30_000);
+  });
+
+  it("shorten cuts the running round, notifies, and does not touch the timer for later rounds", async () => {
+    const repo = memoryRepo();
+    const { env, calls } = makeEnv();
+    const { code, hostToken } = await newGame(repo, env);
+    await joinHandler(repo, env, code, { teamName: "A", deviceId: "d1" }, T0);
+    const q = await hostActionHandler(repo, env, code, hostToken, { type: "start" }, T0);
+    const before = calls.length;
+    const s = await hostActionHandler(repo, env, code, hostToken, { type: "shorten", seconds: 10 }, T0 + 1000);
+    expect(s.round!.endsAt).toBe(q.round!.endsAt - 10_000);
+    expect(s.timerSeconds).toBe(60);
+    expect(calls.length).toBeGreaterThan(before);
+    const expired = await hostActionHandler(repo, env, code, hostToken, { type: "shorten", seconds: 600 }, T0 + 2000);
+    expect(expired.round!.endsAt).toBe(T0 + 2000);
+  });
+
+  it("shorten is WRONG_PHASE in the lobby", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code, hostToken } = await newGame(repo, env);
+    const e = await hostActionHandler(repo, env, code, hostToken, { type: "shorten", seconds: 10 }, T0).catch((x) => x);
+    expect(e).toBeInstanceOf(ApiError);
+    expect((e as ApiError).code).toBe("WRONG_PHASE");
+  });
+
+  it("setTimer is refused once the game is finished", async () => {
+    const repo = memoryRepo();
+    const { env } = makeEnv();
+    const { code, hostToken } = await newGame(repo, env);
+    await hostActionHandler(repo, env, code, hostToken, { type: "end" }, T0);
+    const e = await hostActionHandler(repo, env, code, hostToken, { type: "setTimer", seconds: 30 }, T0).catch((x) => x);
+    expect((e as ApiError).code).toBe("WRONG_PHASE");
   });
 });
 
