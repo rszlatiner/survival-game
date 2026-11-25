@@ -67,14 +67,17 @@ export const UNIT_02: QuestionTemplate[] = [
       for (let i = 0; i < 50; i++) {
         const a = int(rng, 2, 6);
         const c = int(rng, 2, 6);
-        if (a + c !== a * c) return { a, b: int(rng, 2, 9), c };
+        if (a + c !== a * c) {
+          const b = int(rng, 2, 9);
+          if (b !== a + c) return { a, b, c };
+        }
       }
       return { a: 3, b: 4, c: 2 };
     },
     prompt: ({ a, b, c }, zone) =>
       `${Z[zone].Place}, your tally of ${Z[zone].food} is ${a}x + ${b} + ${c}x, where x is the number in one basket. ` +
       `Which is its simplest form?`,
-    options: ({ a, b, c }) => [`${a + c}x + ${b}`, `${a + b + c}x`, `${a * c}x + ${b}`, `${a + c}x² + ${b}`],
+    options: ({ a, b, c }) => [`${a + c}x + ${b}`, `${a + b + c}x`, `${a + b + c}x²`, `${b}x + ${a + c}`],
     expected: ({ a, b, c }) => `${a + c}x + ${b}`,
     solution: ({ a, b, c }) =>
       `Only terms with x can be added together. ${a}x + ${c}x = ${a + c}x. The number ${b} is a different kind of term and stays as it is. ` +
@@ -115,7 +118,7 @@ export const UNIT_02: QuestionTemplate[] = [
       `${a * b}x + ${a * c}`,
       `${a * b}x + ${c}`,
       `${a * b}x + ${b * c}`,
-      `${a + b}x + ${a * c}`,
+      `${a + b}x + ${b * c}`,
     ],
     expected: ({ a, b, c }) => `${a * b}x + ${a * c}`,
     solution: ({ a, b, c }) =>
@@ -167,7 +170,7 @@ export const UNIT_02: QuestionTemplate[] = [
       `${a + c}x + ${co(b - d)}y`,
       `${a + c}x + ${b + d}y`,
       `${a + b + c - d}xy`,
-      `${a + c}x ${MINUS} ${co(b - d)}y`,
+      `${a + c}x ${MINUS} ${b + d}y`,
     ],
     expected: ({ a, b, c, d }) => `${a + c}x + ${co(b - d)}y`,
     solution: ({ a, b, c, d }) =>
@@ -194,7 +197,7 @@ export const UNIT_02: QuestionTemplate[] = [
       `${a + c}x + ${a * b + c * d}`,
       `${a + c}x + ${b + d}`,
       `${a + c}x + ${a * b + d}`,
-      `${a * c}x + ${a * b + c * d}`,
+      `${a * c}x + ${b + d}`,
     ],
     expected: ({ a, b, c, d }) => `${a + c}x + ${a * b + c * d}`,
     solution: ({ a, b, c, d }) =>
@@ -222,8 +225,12 @@ export const UNIT_02: QuestionTemplate[] = [
     resource: "food",
     format: CHOICE,
     params(rng) {
-      const [a, b] = coprimePair(rng, 2, 7);
-      return { a, b, g: [4, 6, 8, 9, 10, 12][int(rng, 0, 5)] };
+      for (let i = 0; i < 100; i++) {
+        const [a, b] = coprimePair(rng, 2, 7);
+        const g = [4, 6, 8, 9, 10, 12][int(rng, 0, 5)];
+        if (a !== g) return { a, b, g };
+      }
+      return { a: 3, b: 5, g: 4 };
     },
     prompt: ({ a, b, g }, zone) =>
       `${Z[zone].Place}, your count of ${Z[zone].food} is ${g * a}x + ${g * b}. Which option is this factorised completely?`,
@@ -232,8 +239,8 @@ export const UNIT_02: QuestionTemplate[] = [
       return [
         `${g}(${a}x + ${b})`,
         `${f}(${(g / f) * a}x + ${(g / f) * b})`,
-        `${g}(${a}x + ${g * b})`,
-        `${g}(${a}x ${MINUS} ${b})`,
+        `${g * a}(x + ${b})`,
+        `${f}(${(g / f) * a}x ${MINUS} ${(g / f) * b})`,
       ];
     },
     expected: ({ a, b, g }) => `${g}(${a}x + ${b})`,
@@ -290,12 +297,12 @@ export const UNIT_02: QuestionTemplate[] = [
       return { a: 3, b: 3, c: 2, d: 2, e: 2 };
     },
     prompt: ({ a, b, c, d, e }, zone) =>
-      `${Z[zone].Place}, a rate of ${Z[zone].water} is ${a}(${b}x + ${c}) ${MINUS} ${d}(x ${MINUS} ${e}). ` +
+      `${Z[zone].Place}, the daily ${Z[zone].water} budget is ${a}(${b}x + ${c}) ${MINUS} ${d}(x ${MINUS} ${e}) litres, where x is the number of days. ` +
       `When it is expanded and simplified, what is the coefficient of x (the number in front of x)?`,
     expected: ({ a, b, d }) => a * b - d,
     solution: ({ a, b, c, d, e }) =>
       `Expand: ${a}(${b}x + ${c}) = ${a * b}x + ${a * c}. Then ${MINUS}${d}(x ${MINUS} ${e}) = ${MINUS}${d}x + ${d * e}. ` +
-      `The x terms are ${a * b}x ${MINUS} ${d}x = ${a * b - d}x, so the coefficient is ${a * b - d}.`,
+      `The x terms are ${a * b}x ${MINUS} ${d}x = ${co(a * b - d)}x, so the coefficient is ${a * b - d}.`,
   },
   {
     id: "u02-perimeter-expr-01",
@@ -303,13 +310,19 @@ export const UNIT_02: QuestionTemplate[] = [
     difficulty: 2,
     resource: "food",
     format: CHOICE,
-    params: (rng) => ({ a: int(rng, 1, 5), b: int(rng, 1, 6), c: int(rng, 1, 5), d: int(rng, 1, 6) }),
+    params(rng) {
+      for (let i = 0; i < 50; i++) {
+        const p = { a: int(rng, 1, 5), b: int(rng, 1, 6), c: int(rng, 1, 5), d: int(rng, 1, 6) };
+        if (p.a !== p.c || p.b !== p.d) return p;
+      }
+      return { a: 2, b: 3, c: 1, d: 4 };
+    },
     prompt: ({ a, b, c, d }, zone) =>
       `${Z[zone].Place}, a rectangular pen for ${Z[zone].food} has sides (${co(a)}x + ${b}) m and (${co(c)}x + ${d}) m. Which expression is its perimeter?`,
     options: ({ a, b, c, d }) => [
       `${2 * (a + c)}x + ${2 * (b + d)}`,
       `${a + c}x + ${b + d}`,
-      `${2 * (a + c)}x + ${b + d}`,
+      `${4 * (a + c)}x + ${2 * (b + d)}`,
       `${a + c}x + ${2 * (b + d)}`,
     ],
     expected: ({ a, b, c, d }) => `${2 * (a + c)}x + ${2 * (b + d)}`,
@@ -325,14 +338,19 @@ export const UNIT_02: QuestionTemplate[] = [
     difficulty: 3,
     resource: "wood",
     format: CHOICE,
-    params: (rng) => ({ a: int(rng, 2, 6), b: int(rng, 2, 9) }),
+    params(rng) {
+      const a = int(rng, 2, 6);
+      let b = int(rng, 2, 9);
+      if (b === a) b = a + 1;
+      return { a, b };
+    },
     prompt: ({ a, b }, zone) =>
-      `${Z[zone].Place}, the hours to cut ${Z[zone].wood} are T = ${a}n + ${b}, where n is the number of logs. Which option makes n the subject?`,
+      `${Z[zone].Place}, the hours needed are T = ${a}n + ${b}, where n is the number of ${Z[zone].wood} cut. Which option makes n the subject?`,
     options: ({ a, b }) => [
       `n = (T ${MINUS} ${b}) ÷ ${a}`,
       `n = T ÷ ${a} ${MINUS} ${b}`,
-      `n = (T + ${b}) ÷ ${a}`,
-      `n = ${a}(T ${MINUS} ${b})`,
+      `n = T ÷ ${a} + ${b}`,
+      `n = (T ÷ ${b}) ${MINUS} ${a}`,
     ],
     expected: ({ a, b }) => `n = (T ${MINUS} ${b}) ÷ ${a}`,
     solution: ({ a, b }) =>
@@ -369,7 +387,7 @@ export const UNIT_02: QuestionTemplate[] = [
         const a = c + int(rng, 1, 3);
         const b = int(rng, 2, 6);
         const d = int(rng, 2, 5);
-        if (a * b - c * d !== b + d) return { a, b, c, d };
+        if (a * b - c * d !== b + d && a * b - c * d !== 0) return { a, b, c, d };
       }
       return { a: 4, b: 3, c, d: 2 };
     },
@@ -378,13 +396,13 @@ export const UNIT_02: QuestionTemplate[] = [
     options: ({ a, b, c, d }) => [
       lin(a - c, a * b + c * d),
       lin(a - c, a * b - c * d),
-      lin(a + c, a * b + c * d),
-      lin(a - c, b + d),
+      lin(a + c, a * b - c * d),
+      lin(a + c, b + d),
     ],
     expected: ({ a, b, c, d }) => lin(a - c, a * b + c * d),
     solution: ({ a, b, c, d }) =>
       `Expand: ${a}(x + ${b}) = ${a}x + ${a * b}. Then ${MINUS}${c}(x ${MINUS} ${d}) = ${MINUS}${c}x + ${c * d}, because ${MINUS}${c} ${TIMES} ${MINUS}${d} is positive. ` +
-      `Collect: ${co(a - c)}x + ${a * b + c * d}, which is ${lin(a - c, a * b + c * d)}.`,
+      `Collect the x terms and the numbers: ${lin(a - c, a * b + c * d)}.`,
   },
   {
     id: "u02-substitute-negative-01",

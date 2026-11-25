@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { UNIT_02 } from "@/content/units/unit-02";
-import { bankChecks, eachQuestion, numsIn } from "./helpers/bank";
+import { bankChecks, overlapChecks, eachQuestion, numsIn } from "./helpers/bank";
 
 bankChecks(2, UNIT_02);
+overlapChecks(UNIT_02);
 
 const get = (id: string) => UNIT_02.find((t) => t.id === id)!;
 
@@ -94,7 +95,7 @@ describe("unit 2 independent recompute", () => {
     }));
   it("expand-02", () =>
     run("u02-expand-02", (p, e) => {
-      const m = /is (\d+)\((\d+)x \+ (\d+)\) − (\d+)\(x − (\d+)\)\./.exec(p)!.slice(1).map(Number);
+      const m = /is (\d+)\((\d+)x \+ (\d+)\) − (\d+)\(x − (\d+)\) litres/.exec(p)!.slice(1).map(Number);
       const f = (x: number) => m[0] * (m[1] * x + m[2]) - m[3] * (x - m[4]);
       expect(f(1) - f(0)).toBe(e);
     }));
