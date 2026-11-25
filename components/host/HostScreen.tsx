@@ -10,7 +10,7 @@ import { Toast } from "@/components/team/Toast";
 import { RESOURCE_LABEL } from "@/components/team/labels";
 import { HostSignIn } from "./HostSignIn";
 import { hostErrorText, isAuthLost } from "./labels";
-import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/api/parse";
+import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/config";
 import { TIMER_PRESETS } from "./timerPresets";
 import { useCountdown } from "./useCountdown";
 import { CrownIcon, HazardIcon, RaftIcon, StarIcon, Sun, TimerIcon, TrophyIcon, ZONE_COLOR } from "@/components/art";
@@ -127,12 +127,15 @@ export function HostScreen({ state, status, send, login }: Props) {
       ) : (
         <section aria-label="Game controls" className={`${panel} space-y-3`}>
           <div className="flex flex-wrap gap-2">
-            {phase === "lobby" && state.teams.length > 0 && <PressStart onDark className="basis-full text-left" />}
             {phase === "lobby" && (
-              <button type="button" disabled={busy || state.teams.length === 0} onClick={() => void act({ type: "start" })} className={tone("palm")}>
-                <StarIcon size={24} />
-                {busy ? "Starting..." : "Start game"}
-              </button>
+              <PressStart
+                onDark
+                label="Start game"
+                busyText={busy ? "Starting..." : undefined}
+                disabled={busy || state.teams.length === 0}
+                onClick={() => void act({ type: "start" })}
+                className="basis-full"
+              />
             )}
             {phase === "lobby" && state.teams.length === 0 && (
               <p data-testid="start-hint" className="self-center text-sm font-bold text-sunset-300">Start unlocks when at least one team has joined.</p>

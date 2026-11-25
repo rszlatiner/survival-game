@@ -60,8 +60,7 @@ export function JoinScreen({ initialCode = "", onJoined }: { initialCode?: strin
             maxLength={6}
             className={`${input} text-center font-black uppercase tracking-[0.3em]`}
           />
-          <PressStart />
-          <button type="submit" disabled={busy || code.length === 0} className={big}>Find game</button>
+          <PressStart type="submit" label="Find game" disabled={busy || code.length === 0} />
         </form>
       ) : (
         <div className="space-y-4">

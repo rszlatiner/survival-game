@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createGame } from "@/lib/client/api";
 import { clearSession, listSessions, type StoredHostSession } from "@/lib/client/storage";
 import { ROUNDS } from "@/lib/config";
-import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/api/parse";
+import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/config";
 import type { GameLength } from "@/lib/types";
 import { hostErrorText } from "./labels";
 import { TIMER_PRESETS } from "./timerPresets";
@@ -257,10 +257,7 @@ export function CreateGame({ readiness }: { readiness: UnitReadiness[] }) {
           </div>
         ) : (
           <>
-          <PressStart />
-          <button type="submit" disabled={busy} className={btn("sunset", "min-h-14 w-full text-xl")}>
-            Create game
-          </button>
+          <PressStart type="submit" label="Create game" disabled={busy} />
           </>
         )}
       </form>

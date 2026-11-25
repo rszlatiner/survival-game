@@ -1,4 +1,4 @@
-import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/api/parse";
+import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/config";
 import { ALL_TEMPLATES } from "@/content/units";
 import { MAX_ANSWER_LENGTH, MAX_OVERRIDE } from "@/lib/config";
 import { GameError } from "@/lib/engine/game";
@@ -39,7 +39,7 @@ export function extendTimer(g: GameState, seconds: number): GameState {
 export function shortenTimer(g: GameState, seconds: number, now: number): GameState {
   const round = openRound(g);
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > TIMER_MAX_SECONDS) throw new GameError("BAD_AMOUNT", String(seconds));
-  return bump(g, { round: { ...round, endsAt: Math.max(now, round.endsAt - seconds * 1000) } });
+  return bump(g, { round: { ...round, endsAt: Math.min(round.endsAt, Math.max(now, round.endsAt - seconds * 1000)) } });
 }
 
 /**

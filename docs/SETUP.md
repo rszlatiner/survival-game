@@ -129,7 +129,7 @@ npm run loadcheck -- <URL> <CODE>
 - **Next round**: starts a round: island roll, then a question for every team, with the timer running. After the last round it reads Finish game.
 - **Reveal answers**: ends the question, shows the correct answer and a worked solution on every screen, harvests resources for correct answers and settles any hazard or raider event.
 - **Extend timer** (type seconds, 1 to 600): adds time to the open question.
-- **-10 s / -30 s** (while a question is open): cuts that much off the running question's timer. Each press cuts again; if the time runs out, teammates can submit as usual. Teams see the change straight away.
+- **-10 s / -30 s** (while a question is open): cuts that much off the running question's timer. Each press cuts again; if the time runs out, teammates can submit as usual. Teams see the change on their next refresh (a second or two).
 - **Time per question** (presets 15, 30, 45, 60, 90 and 120 seconds, or type your own, 10 to 600): sets the timer for all future rounds, in the lobby or between rounds. It never changes the question already running. You can also pick a preset when you create the game.
 - **Skip question**: swaps in a fresh question from the chosen units, restarts the timer and clears submissions and suggestions so far.
 - **End game**: asks you to confirm, then finishes with final scoring. If teams are tied it starts the tiebreak question instead (see below).

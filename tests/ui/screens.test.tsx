@@ -18,11 +18,11 @@ function expectArtAccessible(root: HTMLElement) {
 }
 
 describe("restyled screens keep their labels", () => {
-  it("join screen: wordmark heading, PRESS START decoration, button name unchanged", () => {
+  it("join screen: wordmark heading, PRESS START is the Find game button", () => {
     const { container } = render(<JoinScreen onJoined={() => {}} />);
     expect(screen.getByRole("heading", { name: "Desert Island Maths" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Find game" })).toBeTruthy();
-    expect(screen.getByTestId("press-start").getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByTestId("press-start")).toBe(screen.getByRole("button", { name: "Find game" }));
     expectArtAccessible(container);
   });
 

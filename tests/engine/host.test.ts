@@ -43,7 +43,7 @@ describe("shortenTimer", () => {
     const now = g.round!.endsAt - 5_000;
     expect(shortenTimer(g, 600, now).round!.endsAt).toBe(now);
     const late = g.round!.endsAt + 9_000;
-    expect(shortenTimer(g, 10, late).round!.endsAt).toBe(late);
+    expect(shortenTimer(g, 10, late).round!.endsAt).toBe(g.round!.endsAt); // never lengthens an expired timer
   });
 
   it("rejects bad amounts and works only while a question is open", () => {

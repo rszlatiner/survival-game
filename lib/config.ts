@@ -48,3 +48,5 @@ export const MAX_DEVICES = 6;
 export const MAX_ANSWER_LENGTH = 40;
 /** Largest stock or SP value a teacher override may set. */
 export const MAX_OVERRIDE = 9999;
+export const TIMER_MIN_SECONDS = 10;
+export const TIMER_MAX_SECONDS = 600;

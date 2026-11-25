@@ -11,7 +11,8 @@ import {
   teamSuggestionsHandler,
   type HandlerEnv,
 } from "@/lib/api/handlers";
-import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS, parseCreateBody, parseHostAction, parseLoginBody, parseTeamAction } from "@/lib/api/parse";
+import { TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/config";
+import { parseCreateBody, parseHostAction, parseLoginBody, parseTeamAction } from "@/lib/api/parse";
 import { signToken, verifyToken } from "@/lib/auth";
 import { ROUNDS } from "@/lib/config";
 import { checkWinner } from "@/lib/engine/win";

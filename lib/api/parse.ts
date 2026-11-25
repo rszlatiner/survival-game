@@ -1,4 +1,4 @@
-import { BUILDS, MAX_ANSWER_LENGTH, MAX_OVERRIDE } from "@/lib/config";
+import { BUILDS, MAX_ANSWER_LENGTH, MAX_OVERRIDE, TIMER_MAX_SECONDS, TIMER_MIN_SECONDS } from "@/lib/config";
 import { RESOURCES } from "@/lib/questions/types";
 import type { Resource } from "@/lib/questions/types";
 import type { BuildId, GameLength, Stock } from "@/lib/types";
@@ -33,8 +33,6 @@ export type TeamAction =
   | { type: "exchange"; give: Resource; get: Resource; amount: number }
   | { type: "contribute"; resource: Resource; amount: number };
 
-export const TIMER_MIN_SECONDS = 10;
-export const TIMER_MAX_SECONDS = 600;
 const ID_MAX = 64;
 const NAME_MAX = 100;
 const PASSWORD_MAX = 200;

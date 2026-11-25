@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import * as Art from "@/components/art";
 import { Confetti } from "@/components/ui/Confetti";
 import { IslandBackdrop, NightBackdrop } from "@/components/ui/Backdrop";
@@ -124,9 +124,22 @@ describe("retro pixel style", () => {
     expect(Art.sprite(["kkk."]).rects).toEqual([{ x: 0, y: 0, w: 3, c: Art.PAL.k }]);
   });
 
-  it("PRESS START is decoration only", () => {
-    const { container } = render(<PressStart />);
-    expect(container.firstElementChild!.getAttribute("aria-hidden")).toBe("true");
+  it("PRESS START is a real button that fires its action and is named by its label", () => {
+    const onClick = vi.fn();
+    const { getByRole } = render(<PressStart label="Start game" onClick={onClick} />);
+    const b = getByRole("button", { name: "Start game" });
+    b.click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("PRESS START stops blinking and does nothing when disabled", () => {
+    const onClick = vi.fn();
+    const { getByRole } = render(<PressStart label="Start game" onClick={onClick} disabled />);
+    const b = getByRole("button", { name: "Start game" }) as HTMLButtonElement;
+    expect(b.disabled).toBe(true);
+    expect(b.className).not.toContain(" animate-blink");
+    b.click();
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   it("scanlines live only in the projector backdrop, behind content", () => {
