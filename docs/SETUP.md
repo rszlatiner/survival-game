@@ -155,7 +155,8 @@ Create-game shows an estimate that adds about two minutes per round for reveal a
 
 Students type answers with a keypad under the answer box (fraction `a/b`, power `^`, brackets, minus and so on) or with the keyboard. Tapping a keypad button inserts at the cursor, so students can fix the middle of an answer. A line "You typed" shows how the answer reads, for example `x^2` as x².
 
-- **Numeric questions** (whole number, decimal, fraction, percent) still accept plain numbers, and now also sums written with brackets, powers and `+ - * /`: `2^3`, `(3+4)/7`, `1/2+1/4`. The sum is worked out and judged by the same rule as a plain number, so a whole-number question needs a whole-number result and `6/2` counts as 3. Letters are not allowed in a numeric answer.
+- **Numeric questions** (whole number, decimal, fraction, percent) accept plain numbers only, exactly as before, and show the old keypad. A question can opt in with `allowExpression: true` in its format (for example `{ kind: "integer", allowExpression: true }`); then students also get `^`, brackets (and `a/b` for whole number and decimal) and may type a sum such as `2^3`, `(3+4)/7` or `1/2+1/4`, which is worked out and judged by the same rule as a plain number (so `6/2` counts as 3 for a whole-number question). Letters are never allowed in a numeric answer.
+- **When to set `allowExpression`**: only when the question asks for a form, for example "write 8 as a power of 2", "write the number of seconds as a product" or "simplify this numerical fraction". Never set it on "work out" arithmetic such as "Work out 7 + 4 x 4", because a student could retype the sum and let the game do the maths.
 - **Algebra questions** (`expression` format) accept letters a to z and the signs `+ - * / ^ ( )`, `×`, `÷`, `²`, `³` and `sqrt( )`. Multiplication can be left out as in class: `3x`, `2(x+1)`, `(x+1)(x+2)`, `x^2`. `3x^2` means 3 times x squared and `-x^2` means minus (x squared).
 - **Division with letters**: `1/2x` is read as 1 divided by 2x, not half of x. Students should write `x/2`, `(1/2)x` or `1/2*x`. This matches most calculators.
 - **Equivalent forms are accepted.** The answer is checked by trying the student's expression and yours at 8 fixed values of the letters, so `x^2+2x+1`, `(x+1)^2` and `1+2x+x*x` are all marked correct for `(x+1)^2`. The game does not tell factorised from expanded form: if you need students to expand, say so in the question wording.
@@ -187,7 +188,7 @@ Each unit has one file in `content/units/`. Unit 11 (`content/units/unit-11.ts`)
    - `unit`: the unit number (1 to 15), the same for the whole file
    - `difficulty`: `1`, `2` or `3`
    - `resource`: which resource a correct answer harvests, one of `water`, `food`, `wood`, `stone`
-   - `format`: the answer type: `{ kind: "integer" }`, `{ kind: "decimal", places: 2 }`, `{ kind: "fraction" }`, `{ kind: "percent" }`, `{ kind: "choice", options: [] }` or `{ kind: "expression" }` (see "Algebra questions" below)
+   - `format`: the answer type: `{ kind: "integer" }`, `{ kind: "decimal", places: 2 }`, `{ kind: "fraction" }`, `{ kind: "percent" }`, `{ kind: "choice", options: [] }` or `{ kind: "expression" }` (see "Algebra questions" below). Numeric formats also take an optional `allowExpression: true` (see "Maths input" in Part B for when to use it)
    - `params(rng)`: picks the numbers. Use the helpers in `lib/questions/random.ts` (`int`, `coprimePair`, `gcd`) so results are repeatable. Choose numbers backwards from a clean answer.
    - `prompt(p, zone)`: the question text. Use `ZONE_WORDS[zone]` from `content/units/zones.ts` (as unit 11 does with `Z`) for island wording.
    - `expected(p)`: the correct answer, a number (or, for choice, the exact correct option text; for expression, the answer as text such as `3x+6`)
@@ -205,7 +206,7 @@ Use `format: { kind: "expression" }` when the answer is an algebraic expression 
 
 1. Write `expected(p)` as a string in the student syntax, for example `` `${a + 1}x+${a * b}` `` gives `3x+6`. Use only letters, digits, `+ - * / ^ ( )` and `sqrt( )`; `1/2x` means 1/(2x), so write `(1/2)x` or `x/2`.
 2. The student may type any equivalent form (`6+3x`, `3(x+2)`, `x*3+6`), because answers are compared by value, not by spelling. Expanded and factorised forms are not told apart, so the prompt must say "expand" or "factorise" if the form matters. Use `choice` for that, or when the answer is a statement such as "no solution".
-3. Do not give an `options` function; the answer is typed. The game checks your `expected` text parses when the question is generated, and a broken one throws a clear error in `npm test`.
+3. Do not give an `options` function; the answer is typed. The game checks your `expected` text parses when the question is generated, and `tests/questions.test.ts` generates every registered template, so a broken one fails `npm test` with a clear error. That test also checks that your `expected` marks itself correct and that your `solution` contains the expected text.
 4. Keep the letters the same as in the prompt (`x`), because a student answer that uses any other letter is marked wrong. Keep the answer under 40 characters.
 5. Choose numbers so the expected text is tidy (no `+-3`, write `x-3`) and so a wrong but similar expression such as `3x+5` really is different.
 6. The reveal shows your expected text tidied (`x^2` appears as x²), so also write the worked `solution(p)` with plain text.

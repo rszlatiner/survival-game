@@ -17,6 +17,13 @@ describe("prettyMath", () => {
     expect(prettyMath("x^")).toBe("x^");
     expect(prettyMath("^2")).toBe("²");
   });
+  it("leaves towers and chained exponents exactly as typed", () => {
+    expect(prettyMath("x^2^3")).toBe("x^2^3");
+    expect(prettyMath("2^3^2")).toBe("2^3^2");
+    expect(prettyMath("x²^3")).toBe("x²^3");
+    expect(prettyMath("x^2+y^3")).toBe("x²+y³");
+    expect(prettyMath("x^2*y^3")).toBe("x²·y³");
+  });
   it("renders * as × between numbers and · otherwise", () => {
     expect(prettyMath("2*3")).toBe("2×3");
     expect(prettyMath("2 * 3")).toBe("2 × 3");

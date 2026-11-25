@@ -11,8 +11,16 @@ const BASE_CHARS = "0123456789.,-/%^()*+ ";
 /** Expression answers also allow letters and the unicode maths signs. */
 const EXPR_CHARS = BASE_CHARS + "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ√×÷²³·−";
 
-function keepAllowed(text: string, kind: string): string {
-  const allowed = kind === "expression" ? EXPR_CHARS : BASE_CHARS;
+/** Original numeric sets, used unless the question sets allowExpression. */
+const PLAIN_CHARS: Record<string, string> = {
+  integer: "0123456789-",
+  decimal: "0123456789.,-",
+  fraction: "0123456789/-",
+  percent: "0123456789/.,%-",
+};
+
+function keepAllowed(text: string, kind: string, richNumeric: boolean): string {
+  const allowed = kind === "expression" ? EXPR_CHARS : richNumeric ? BASE_CHARS : (PLAIN_CHARS[kind] ?? PLAIN_CHARS.decimal);
   let out = "";
   for (const ch of text) if (allowed.includes(ch)) out += ch;
   return out;
@@ -43,11 +51,18 @@ const K = {
 
 /** Keypad per answer format: the original buttons first (labels unchanged), then the maths keys. */
 const KEYS: Record<string, Key[]> = {
-  integer: [K.minus, K.fraction, K.power, K.open, K.close],
-  decimal: [K.minus, K.dot, K.fraction, K.power, K.open, K.close],
-  fraction: [K.minus, K.slashLegacy, K.power, K.open, K.close],
-  percent: [K.slashLegacy, K.percent, K.dot, K.power, K.open, K.close],
+  integer: [K.minus],
+  decimal: [K.minus, K.dot],
+  fraction: [K.minus, K.slashLegacy],
+  percent: [K.slashLegacy, K.percent, K.dot],
   expression: [K.x, K.power, K.open, K.close, K.fraction, K.plus, K.minus, K.times, K.sqrt, K.dot],
+};
+/** Extra keys for numeric questions that set allowExpression (powers, brackets, fraction slash). */
+const RICH_KEYS: Record<string, Key[]> = {
+  integer: [K.fraction, K.power, K.open, K.close],
+  decimal: [K.fraction, K.power, K.open, K.close],
+  fraction: [K.power, K.open, K.close],
+  percent: [K.power, K.open, K.close],
 };
 
 interface Props {
@@ -78,6 +93,8 @@ export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy,
     pendingCaret.current = null;
   }, [question.prompt, resetKey]);
   const kind = question.format.kind;
+  const richNumeric = "allowExpression" in question.format && question.format.allowExpression === true;
+  const keys = [...(KEYS[kind] ?? []), ...(richNumeric ? (RICH_KEYS[kind] ?? []) : [])];
   const options = question.format.kind === "choice" ? (question.options ?? question.format.options) : null;
   const verb = canSubmit ? "Submit" : "Suggest";
   const set = (v: string) => {
@@ -125,8 +142,8 @@ export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy,
     else inputRef.current?.focus();
   };
   const onType = (raw: string, caret: number | null) => {
-    const kept = keepAllowed(raw, kind);
-    const before = keepAllowed(raw.slice(0, caret ?? raw.length), kind);
+    const kept = keepAllowed(raw, kind, richNumeric);
+    const before = keepAllowed(raw.slice(0, caret ?? raw.length), kind, richNumeric);
     const clipped = kept.slice(0, MAX_ANSWER_LENGTH);
     const pos = Math.min(before.length, clipped.length);
     sel.current = { start: pos, end: pos };
@@ -205,7 +222,7 @@ export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy,
             </p>
           )}
           <div role="group" aria-label="Maths keypad" className="flex flex-wrap gap-2">
-            {(KEYS[kind] ?? []).map((k) => (
+            {keys.map((k) => (
               <button
                 key={k.aria}
                 type="button"
@@ -220,7 +237,7 @@ export function AnswerPanel({ question, canSubmit, submitted, suggestions, busy,
             ))}
             <button
               type="button"
-              aria-label="Delete last character"
+              aria-label="Delete character before cursor"
               onMouseDown={(e) => e.preventDefault()}
               onClick={backspace}
               className={btn("sand", "min-h-11 min-w-12 text-xl")}

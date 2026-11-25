@@ -97,13 +97,10 @@ describe("integer format", () => {
     expect(isCorrect("3.5", 3, int)).toBe(false);
     expect(isCorrect("3.5", 3.5, int)).toBe(false);
   });
-  it("rejects percent spellings; a slash is accepted only when it evaluates to a whole number", () => {
+  it("rejects fraction and percent spellings", () => {
+    expect(parseNumeric("6/2", int)).toBeNull();
     expect(parseNumeric("300%", int)).toBeNull();
-    // Deliberate change (maths input): 6/2 is an expression that evaluates to 3, so it is accepted.
-    expect(parseNumeric("6/2", int)).toBe(3);
-    expect(isCorrect("6/2", 3, int)).toBe(true);
-    expect(parseNumeric("7/2", int)).toBeNull();
-    expect(parseNumeric("1/0", int)).toBeNull();
+    expect(isCorrect("6/2", 3, int)).toBe(false);
   });
   it("treats comma groups as thousands separators (ambiguity decision)", () => {
     expect(isCorrect("1,500", 1500, int)).toBe(true);
@@ -125,13 +122,9 @@ describe("decimal format", () => {
     expect(isCorrect("3.1416", 3.1416, dec2)).toBe(false);
     expect(isCorrect("3", 3.1416, dec2)).toBe(false);
   });
-  it("rejects percent spellings; a slash expression is evaluated, then judged by the same rounding rule", () => {
+  it("rejects fraction/percent spellings", () => {
+    expect(parseNumeric("1/2", dec2)).toBeNull();
     expect(parseNumeric("50%", dec2)).toBeNull();
-    // Deliberate change (maths input): 1/2 now evaluates to 0.5 instead of being rejected outright.
-    expect(parseNumeric("1/2", dec2)).toBe(0.5);
-    expect(isCorrect("1/2", 0.5, dec2)).toBe(true);
-    expect(isCorrect("1/3", 1 / 3, dec2)).toBe(false); // 0.3333... is not the 2-place answer 0.33
-    expect(isCorrect("33/100", 1 / 3, dec2)).toBe(true);
   });
   it("treats comma groups as ambiguous and rejects them", () => {
     expect(parseNumeric("1,000", dec2)).toBeNull();
@@ -172,7 +165,36 @@ describe("expected value validation", () => {
   });
 });
 
-describe("numeric formats accept pure-number expressions", () => {
+describe("numeric formats accept pure-number expressions only when allowExpression is set", () => {
+  const int = { kind: "integer", allowExpression: true } as AnswerFormat;
+  const dec2 = { kind: "decimal", places: 2, allowExpression: true } as AnswerFormat;
+  const frac = { kind: "fraction", allowExpression: true } as AnswerFormat;
+  const pct = { kind: "percent", allowExpression: true } as AnswerFormat;
+  it("is off by default: the student cannot retype 'work out' arithmetic and let the engine solve it", () => {
+    const off: AnswerFormat[] = [
+      { kind: "integer" }, { kind: "decimal", places: 2 }, { kind: "fraction" }, { kind: "percent" },
+      { kind: "integer", allowExpression: false },
+    ];
+    for (const f of off) {
+      const rational = f.kind === "fraction" || f.kind === "percent"; // a plain a/b is a valid fraction anyway
+      for (const s of ["7+4*4", "2^3", "(3+4)/7", "1/2+1/4", "6/2", "2(3)", "3×4", "10-4", "3²"]) {
+        if (rational && s === "6/2") continue;
+        expect(parseNumeric(s, f), `${f.kind} ${s}`).toBeNull();
+        expect(isCorrect(s, 23, f), `${f.kind} ${s}`).toBe(false);
+      }
+    }
+    expect(isCorrect("23", 23, { kind: "integer" })).toBe(true);
+    expect(isCorrect("1/2", 0.5, { kind: "fraction" })).toBe(true);
+    expect(parseNumeric("7+4*4", int)).toBe(23);
+  });
+  it("integer with the flag accepts 6/2 as 3 and rejects 7/2; decimal with the flag evaluates 1/2", () => {
+    expect(parseNumeric("6/2", int)).toBe(3);
+    expect(isCorrect("6/2", 3, int)).toBe(true);
+    expect(parseNumeric("7/2", int)).toBeNull();
+    expect(parseNumeric("1/2", dec2)).toBe(0.5);
+    expect(isCorrect("1/3", 1 / 3, dec2)).toBe(false);
+    expect(isCorrect("33/100", 1 / 3, dec2)).toBe(true);
+  });
   it("integer: exponents, brackets and arithmetic", () => {
     expect(isCorrect("2^3", 8, int)).toBe(true);
     expect(isCorrect("2^5", 32, int)).toBe(true);
@@ -254,6 +276,13 @@ describe("expression format", () => {
     expect(isCorrect("x^4", "x^2*x^2*x", ex)).toBe(false);
     expect(isCorrect("1/2x", "(1/2)x", ex)).toBe(false); // documented convention: 1/2x is 1/(2x)
     expect(isCorrect("1/2*x", "(1/2)x", ex)).toBe(true);
+  });
+  it("does not alias when there are more than 8 variables", () => {
+    // a and i would share a sample value if values simply wrapped around every 8 variables.
+    const e = "a-i+0b+0c+0d+0e+0f+0g+0h";
+    expect(isCorrect(e, e, ex)).toBe(true);
+    expect(isCorrect("i-a+0b+0c+0d+0e+0f+0g+0h", e, ex)).toBe(false);
+    expect(isCorrect("0+a-i+0h+0g+0f+0e+0d+0c+0b", e, ex)).toBe(true);
   });
   it("rejects a different variable set", () => {
     expect(isCorrect("y+1", "x+1", ex)).toBe(false);

@@ -35,12 +35,13 @@ function setup(format: AnswerFormat, onSend = vi.fn()) {
   return { user, input, key, select, onSend };
 }
 
-const INT: AnswerFormat = { kind: "integer" };
+const INT: AnswerFormat = { kind: "integer", allowExpression: true };
+const INT_PLAIN: AnswerFormat = { kind: "integer" };
 const EXPR: AnswerFormat = { kind: "expression" };
 
 describe("keypad", () => {
   it("every button has an accessible label and is at least 44px tall", () => {
-    for (const f of [INT, { kind: "decimal", places: 2 } as AnswerFormat, { kind: "fraction" } as AnswerFormat, { kind: "percent" } as AnswerFormat, EXPR]) {
+    for (const f of [INT, { kind: "decimal", places: 2, allowExpression: true } as AnswerFormat, { kind: "fraction", allowExpression: true } as AnswerFormat, { kind: "percent", allowExpression: true } as AnswerFormat, EXPR]) {
       const { unmount } = render(<AnswerPanel question={q(f)} canSubmit submitted={false} suggestions={[]} busy={false} onSend={() => {}} />);
       const group = screen.getByRole("group", { name: /maths keypad/i });
       const buttons = Array.from(group.querySelectorAll("button"));
@@ -54,9 +55,33 @@ describe("keypad", () => {
     }
   });
 
-  it("numeric formats get fraction, power and brackets; expression-only keys stay off them", () => {
+  it("numeric questions WITHOUT allowExpression keep the original keypad and filter, no powers or brackets", async () => {
+    const { user, input } = setup(INT_PLAIN);
+    expect(screen.queryByRole("button", { name: "Insert power" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Insert open bracket" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Insert fraction slash" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Insert -" })).toBeTruthy();
+    await user.type(input, "2^(3)+4*5/6");
+    expect(input.value).toBe("23456");
+    cleanup();
+    for (const f of [{ kind: "decimal", places: 1 }, { kind: "fraction" }, { kind: "percent" }] as AnswerFormat[]) {
+      render(<AnswerPanel question={q(f)} canSubmit submitted={false} suggestions={[]} busy={false} onSend={() => {}} />);
+      expect(screen.queryByRole("button", { name: "Insert power" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Insert close bracket" })).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("expression questions always show power and brackets", () => {
+    setup(EXPR);
+    for (const n of ["Insert power", "Insert open bracket", "Insert close bracket", "Insert fraction slash"]) {
+      expect(screen.getByRole("button", { name: n })).toBeTruthy();
+    }
+  });
+
+  it("numeric formats with allowExpression get fraction, power and brackets; expression-only keys stay off them", () => {
     const { key } = setup(INT);
-    for (const n of ["Insert fraction slash", "Insert power", "Insert open bracket", "Insert close bracket", "Insert -", "Delete last character"]) {
+    for (const n of ["Insert fraction slash", "Insert power", "Insert open bracket", "Insert close bracket", "Insert -", "Delete character before cursor"]) {
       expect(key(n)).toBeTruthy();
     }
     expect(screen.queryByRole("button", { name: "Insert x" })).toBeNull();
@@ -66,7 +91,7 @@ describe("keypad", () => {
 
   it("keeps the original button labels for fraction and percent", () => {
     cleanup();
-    setup({ kind: "fraction" });
+    setup({ kind: "fraction", allowExpression: true });
     expect(screen.getByRole("button", { name: "Insert /" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Insert -" })).toBeTruthy();
     cleanup();
@@ -188,7 +213,7 @@ describe("backspace key", () => {
     const { user, input, key, select } = setup(INT);
     await user.type(input, "123");
     select(2);
-    await user.click(key("Delete last character"));
+    await user.click(key("Delete character before cursor"));
     expect(input.value).toBe("13");
     expect(input.selectionStart).toBe(1);
     expect(document.activeElement).toBe(input);
@@ -197,7 +222,7 @@ describe("backspace key", () => {
     const { user, input, key, select } = setup(INT);
     await user.type(input, "12345");
     select(1, 4);
-    await user.click(key("Delete last character"));
+    await user.click(key("Delete character before cursor"));
     expect(input.value).toBe("15");
     expect(input.selectionStart).toBe(1);
   });
@@ -205,10 +230,10 @@ describe("backspace key", () => {
     const { user, input, key, select } = setup(INT);
     await user.type(input, "12");
     select(0);
-    await user.click(key("Delete last character"));
+    await user.click(key("Delete character before cursor"));
     expect(input.value).toBe("12");
     select(2);
-    await user.click(key("Delete last character"));
+    await user.click(key("Delete character before cursor"));
     expect(input.value).toBe("1");
   });
 });

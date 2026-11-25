@@ -20,7 +20,9 @@ export function prettyMath(s: string): string {
   let out = "";
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
-    if (c === "^" && isDigit(s[i + 1]) && !isDigit(s[i + 2]) && s[i + 2] !== ".") {
+    // A tower such as x^2^3 is ambiguous when flattened, so it is left exactly as typed.
+    const inTower = (isDigit(s[i - 1]) && s[i - 2] === "^") || (out !== "" && SUPERSCRIPT.includes(out[out.length - 1]));
+    if (c === "^" && isDigit(s[i + 1]) && !isDigit(s[i + 2]) && s[i + 2] !== "." && s[i + 2] !== "^" && !inTower) {
       out += SUPERSCRIPT[Number(s[i + 1])];
       i++;
     } else if (c === "*") {

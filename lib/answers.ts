@@ -1,10 +1,16 @@
 import { evalExpr, parseExpr, variablesOf } from "@/lib/mathexpr";
 
 export type AnswerFormat =
-  | { kind: "integer" }
-  | { kind: "decimal"; places: number }
-  | { kind: "fraction" }
-  | { kind: "percent" }
+  /**
+   * `allowExpression` (numeric kinds only, default off): also accept a pure-number
+   * expression such as 2^3 or (3+4)/7 and judge its value. Use it only for
+   * questions like "write as a power" or "simplify this fraction"; never on
+   * "work out" arithmetic, where it would let the engine do the student's maths.
+   */
+  | { kind: "integer"; allowExpression?: boolean }
+  | { kind: "decimal"; places: number; allowExpression?: boolean }
+  | { kind: "fraction"; allowExpression?: boolean }
+  | { kind: "percent"; allowExpression?: boolean }
   | { kind: "choice"; options: string[] }
   /** `expected` is a string expression such as "3x+6"; any equivalent form is accepted. */
   | { kind: "expression" };
@@ -31,12 +37,13 @@ function parsePlain(s: string, allowThousands: boolean): number | null {
  * Percent spellings ("50%") yield the fraction value (0.5).
  *
  * Plain spellings ("12", "1,5", "3/4", "50%") are judged first, exactly as
- * before. Only when that fails and the text contains an operator, bracket or
- * "^" is it tried as a pure-number expression ("2^3", "(3+4)/7", "1/2+1/4"):
+ * before. Only when the format sets `allowExpression`, that fails, and the
+ * text contains an operator, bracket or "^" is it tried as a pure-number expression ("2^3", "(3+4)/7", "1/2+1/4"):
  * evaluated, then held to the format (integer must be whole). A variable makes
  * it invalid. Exception: for fraction and percent a slash-only text such as
  * "1/2/3" or "1.5/3" keeps the strict a/b rule and is not re-read as an
- * expression. For integer and decimal, "6/2" now evaluates to 3 and is accepted.
+ * expression. With the flag on, "6/2" for an integer question evaluates to 3 and
+ * is accepted; with it off (the default) it is rejected as it always was.
  */
 export function parseNumeric(input: string, format: AnswerFormat): number | null {
   if (typeof input !== "string" || format.kind === "choice" || format.kind === "expression") return null;
@@ -44,7 +51,7 @@ export function parseNumeric(input: string, format: AnswerFormat): number | null
   if (s === "" || s.length > 40) return null;
   const plain = parsePlainAnswer(s, format);
   if (plain !== null) return plain;
-  return parseNumericExpression(s, format);
+  return format.allowExpression === true ? parseNumericExpression(s, format) : null;
 }
 
 /** Characters that mark text as an attempted expression rather than a malformed plain number. */
@@ -135,7 +142,11 @@ export function isCorrect(input: string, expected: number | string, format: Answ
   }
 }
 
-/** Fixed, deterministic sample values; variable j at sample i uses SAMPLES[(i + 3j) % 8]. */
+/**
+ * Fixed, deterministic sample values; variable j at sample i uses
+ * SAMPLES[(i + 3j) % 8] plus 0.37 per full group of 8 variables, so that
+ * more than 8 variables never share a value (no aliasing).
+ */
 const SAMPLES = [2, -3, 0.5, 7, 1.5, -1, 4, 11];
 const MIN_VALID_POINTS = 5;
 
@@ -159,7 +170,7 @@ function expressionsEquivalent(input: string, expected: string): boolean {
   let valid = 0;
   for (let i = 0; i < SAMPLES.length; i++) {
     const point: Record<string, number> = {};
-    vars.forEach((v, j) => (point[v] = SAMPLES[(i + 3 * j) % SAMPLES.length]));
+    vars.forEach((v, j) => (point[v] = SAMPLES[(i + 3 * j) % SAMPLES.length] + Math.floor(j / SAMPLES.length) * 0.37));
     const x = evalExpr(a, point);
     const y = evalExpr(b, point);
     if (x === null || y === null) continue;

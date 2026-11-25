@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { isCorrect, parseNumeric } from "@/lib/answers";
+import { parseExpr } from "@/lib/mathexpr";
 import { ZONE_IDS, RESOURCES, type QuestionTemplate, type Difficulty } from "@/lib/questions/types";
 import { generateQuestion, pickTemplates } from "@/lib/questions/generate";
 import { unitReadiness } from "@/lib/questions/ready";
@@ -79,6 +80,12 @@ describe("every template, every zone, seeds 1..20", () => {
             expect(publicQ.format, where).toEqual({ kind: "choice", options: opts });
             expect(isCorrect(expected as string, expected, publicQ.format), where).toBe(true);
             expect(solution, where).toContain(expected as string);
+          } else if (t.format.kind === "expression") {
+            expect(typeof expected, where).toBe("string");
+            expect(parseExpr(expected as string), where).not.toBeNull();
+            expect(isCorrect(expected as string, expected, publicQ.format), where).toBe(true);
+            expect(solution, where).toContain(expected as string);
+            expect(publicQ.options, where).toBeUndefined();
           } else {
             expect(typeof expected, where).toBe("number");
             const n = expected as number;

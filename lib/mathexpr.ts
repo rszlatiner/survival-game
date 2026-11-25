@@ -12,8 +12,9 @@
  *   functions    sqrt( ) or √( )
  *
  * Conventions (all tested):
- *   - Precedence, loosest to tightest: + -  |  * /  |  implicit multiplication
- *     |  unary minus  |  ^.  So 1/2x is 1/(2x), NOT (1/2)x. Write (1/2)x or
+ *   - Precedence, loosest to tightest: + -  |  * /  |  unary minus  |
+ *     implicit multiplication  |  ^.  So 1/2x is 1/(2x), NOT (1/2)x, and -2x
+ *     is -(2x). A leading unary plus is ignored. Write (1/2)x or
  *     1/2*x for the other reading. 6/2(1+2) is 6/(2*3) = 1.
  *   - Implicit multiplication happens only before a variable, "(" or sqrt:
  *     3x, 2(x+1), (x+1)(x+2), x(x-1), xy. A number can never follow a number,
@@ -25,8 +26,10 @@
  *   - The exponent must be a constant integer from -20 to 20 (it may be an
  *     expression of numbers such as 2^(1+1)); anything else is invalid.
  *
- * Hard limits: input <= 40 chars, nesting depth <= 8, tokens <= 60, results
- * must be finite.
+ * Bare "sqrt" without a bracket is just the letters s, q, r, t.
+ *
+ * Hard limits: input <= 40 chars, nesting depth <= 8, tokens <= 60 (a backstop
+ * that the 40-char cap normally reaches first), results must be finite.
  */
 
 export type Expr =
