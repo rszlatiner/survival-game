@@ -9,8 +9,8 @@ const get = (id: string) => UNIT_03.find((t) => t.id === id)!;
 function roundStr(s: string, places: number): number {
   const [i, f = ""] = s.split(".");
   const digits = (i + f.padEnd(places + 1, "0")).replace(/^0+(?=\d)/, "");
-  const whole = BigInt(digits.slice(0, i.length + places)) + (Number(digits[i.length + places]) >= 5 ? 1n : 0n);
-  return Number(whole) / 10 ** places;
+  const whole = Number(digits.slice(0, i.length + places)) + (Number(digits[i.length + places]) >= 5 ? 1 : 0);
+  return whole / 10 ** places;
 }
 const roundSf = (v: number, sf: number) => {
   const pv = 10 ** (String(v).length - sf);
